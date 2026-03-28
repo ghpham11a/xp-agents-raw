@@ -5,6 +5,7 @@ import { useParams } from "next/navigation";
 import { useConversation } from "@/hooks/useConversation";
 import { useAgentStream } from "@/hooks/useAgentStream";
 import ChatPanel from "@/components/chat/ChatPanel";
+import PlanPanel from "@/components/plan/PlanPanel";
 import ConversationList from "@/components/sidebar/ConversationList";
 import type { Message } from "@/lib/types";
 
@@ -28,6 +29,11 @@ export default function ConversationPage() {
     streamingText,
     isStreaming,
     toolCalls,
+    plan,
+    planStreamText,
+    files,
+    fileContents,
+    runId,
     sendMessage,
     reset,
   } = useAgentStream();
@@ -107,6 +113,18 @@ export default function ConversationPage() {
           isStreaming={isStreaming}
           toolCalls={toolCalls}
           onSend={handleSend}
+        />
+      </div>
+
+      {/* Plan + scratchpad panel */}
+      <div className="w-80 shrink-0">
+        <PlanPanel
+          plan={plan}
+          planStreamText={planStreamText}
+          isStreaming={isStreaming}
+          files={files}
+          fileContents={fileContents}
+          runId={runId}
         />
       </div>
     </div>

@@ -21,6 +21,7 @@ export interface AgentStreamState {
 
   // Files
   files: FileInfo[];
+  fileContents: Record<string, string>;
 
   // Metadata
   toolCalls: ToolCall[];
@@ -34,6 +35,7 @@ const INITIAL_STATE: AgentStreamState = {
   plan: null,
   planStreamText: "",
   files: [],
+  fileContents: {},
   toolCalls: [],
   runId: null,
   error: null,
@@ -61,9 +63,17 @@ export function useAgentStream() {
         case "file_update": {
           const existing = prev.files.filter((f) => f.path !== event.data.path);
           if (event.data.action === "deleted") {
-            return { ...prev, files: existing };
+            const { [event.data.path]: _, ...remainingContents } = prev.fileContents;
+            return { ...prev, files: existing, fileContents: remainingContents };
           }
-          return { ...prev, files: [...existing, { path: event.data.path, size: 0 }] };
+          const updatedContents = event.data.content != null
+            ? { ...prev.fileContents, [event.data.path]: event.data.content }
+            : prev.fileContents;
+          return {
+            ...prev,
+            files: [...existing, { path: event.data.path, size: 0 }],
+            fileContents: updatedContents,
+          };
         }
 
         case "done":

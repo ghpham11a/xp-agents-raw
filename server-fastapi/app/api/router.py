@@ -1,5 +1,6 @@
 import logging
 import os
+import shutil
 
 from pathlib import Path
 
@@ -66,10 +67,20 @@ def get_conversation(conversation_id: str):
 def delete_conversation(conversation_id: str):
     db = get_db()
     try:
+        # Collect run_ids before deleting messages
+        run_ids = queries.get_run_ids(db, conversation_id)
         queries.delete_conversation(db, conversation_id)
-        return {"ok": True}
     finally:
         db.close()
+
+    # Clean up agent_runs directories
+    for run_id in run_ids:
+        run_dir = Path(BASE_DIR) / run_id
+        if run_dir.exists():
+            shutil.rmtree(run_dir)
+            logger.info(f"Deleted agent run directory: {run_id}")
+
+    return {"ok": True}
 
 
 # ── Messages & Streaming ─────────────────────────────────

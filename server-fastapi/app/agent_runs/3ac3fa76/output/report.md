@@ -1,3 +1,0 @@
-# What Are AI Agent Evals?
-
-AI Agent evals are systematic methods for measuring and assessing the performance, capabilities, and behavior of AI agents. They evaluate how well an agent accomplishes tasks, follows instructions, handles edge cases, and maintains safety and reliability across various scenarios. These evaluations typically involve running agents through standardized benchmarks, test suites, or real-world simulations to measure metrics like task completion rates, accuracy, efficiency, and alignment with intended goals. Agent evals are crucial for identifying weaknesses, comparing different agent architectures, and ensuring agents behave safely and effectively before deployment.

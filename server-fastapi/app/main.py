@@ -36,7 +36,7 @@ app = FastAPI(title="Agent Chat API", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],
+    allow_origins=["http://localhost:3005"],
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -51,4 +51,4 @@ if __name__ == "__main__":
         from agent.agent import run_agent
         run_agent(task="What is an LLM. Give me a quick sentence")
     else:
-        uvicorn.run("main:app", host="0.0.0.0", port=8001, reload=True)
+        uvicorn.run("main:app", host="0.0.0.0", port=8005, reload=True)

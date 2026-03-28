@@ -49,6 +49,15 @@ def update_conversation_timestamp(db: sqlite3.Connection, conversation_id: str):
     db.commit()
 
 
+def get_run_ids(db: sqlite3.Connection, conversation_id: str) -> list[str]:
+    """Return all non-null run_ids for a conversation's messages."""
+    rows = db.execute(
+        "SELECT DISTINCT run_id FROM messages WHERE conversation_id = ? AND run_id IS NOT NULL",
+        (conversation_id,),
+    ).fetchall()
+    return [row["run_id"] for row in rows]
+
+
 def delete_conversation(db: sqlite3.Connection, conversation_id: str):
     db.execute("DELETE FROM messages WHERE conversation_id = ?", (conversation_id,))
     db.execute("DELETE FROM conversations WHERE id = ?", (conversation_id,))

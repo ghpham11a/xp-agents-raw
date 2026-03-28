@@ -4,30 +4,38 @@ import { useCallback, useEffect, useState } from "react";
 import { readRunFile } from "@/lib/api";
 
 interface FileViewerProps {
-  runId: string;
+  runId: string | null;
   filePath: string;
+  liveContent?: string;
   onClose: () => void;
 }
 
-export default function FileViewer({ runId, filePath, onClose }: FileViewerProps) {
-  const [content, setContent] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
+export default function FileViewer({ runId, filePath, liveContent, onClose }: FileViewerProps) {
+  const [fetchedContent, setFetchedContent] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  // If we have live content from the stream, use it directly.
+  // Otherwise fall back to fetching from the API (post-run).
+  const content = liveContent ?? fetchedContent;
 
   const fetchFile = useCallback(async () => {
+    if (!runId) return;
     setLoading(true);
     try {
       const result = await readRunFile(runId, filePath);
-      setContent(result.content);
+      setFetchedContent(result.content);
     } catch {
-      setContent("Failed to load file.");
+      setFetchedContent("Failed to load file.");
     } finally {
       setLoading(false);
     }
   }, [runId, filePath]);
 
   useEffect(() => {
-    fetchFile();
-  }, [fetchFile]);
+    if (liveContent == null && runId) {
+      fetchFile();
+    }
+  }, [liveContent, runId, fetchFile]);
 
   return (
     <div className="border border-zinc-700 rounded-lg overflow-hidden bg-zinc-900">
@@ -44,7 +52,7 @@ export default function FileViewer({ runId, filePath, onClose }: FileViewerProps
 
       {/* Content */}
       <div className="p-3 max-h-64 overflow-y-auto">
-        {loading ? (
+        {loading && content == null ? (
           <div className="text-xs text-zinc-500">Loading...</div>
         ) : (
           <pre className="text-xs text-zinc-300 font-mono whitespace-pre-wrap break-words leading-relaxed">

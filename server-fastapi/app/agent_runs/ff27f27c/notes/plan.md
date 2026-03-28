@@ -1,7 +1,7 @@
 # Plan
 
 ## Goal
-In a few sentences, what are AI Agent evals?
+What is an LLM
 
 ## Steps
 - [ ] Research the topic

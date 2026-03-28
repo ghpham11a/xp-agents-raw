@@ -1,6 +1,6 @@
 import type { Conversation, ConversationWithMessages, FileInfo, SSEEvent } from "./types";
 
-const API_BASE = "http://localhost:8001/api";
+const API_BASE = "http://localhost:8005/api";
 
 // ── REST endpoints ────────────────────────────────────────
 

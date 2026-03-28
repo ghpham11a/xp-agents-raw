@@ -11,6 +11,7 @@ interface PlanPanelProps {
   planStreamText: string;
   isStreaming: boolean;
   files: FileInfo[];
+  fileContents: Record<string, string>;
   runId: string | null;
 }
 
@@ -19,6 +20,7 @@ export default function PlanPanel({
   planStreamText,
   isStreaming,
   files,
+  fileContents,
   runId,
 }: PlanPanelProps) {
   const [selectedFile, setSelectedFile] = useState<string | null>(null);
@@ -27,6 +29,11 @@ export default function PlanPanel({
 
   return (
     <div className="flex flex-col h-full bg-zinc-900 border-l border-zinc-800">
+      {/* Panel header */}
+      <div className="px-5 py-3 border-b border-zinc-800">
+        <h1 className="text-sm font-semibold text-zinc-300">Scratchpad</h1>
+      </div>
+
       <div className="flex-1 overflow-y-auto p-5 space-y-6">
         {/* Plan section */}
         <div>
@@ -58,7 +65,7 @@ export default function PlanPanel({
           <div>
             <h2 className="text-xs font-semibold uppercase tracking-wider text-zinc-500 mb-3 flex items-center gap-2">
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-              Output Files
+              Files
             </h2>
 
             <ul className="space-y-1">
@@ -79,11 +86,12 @@ export default function PlanPanel({
             </ul>
 
             {/* File viewer */}
-            {selectedFile && runId && (
+            {selectedFile && (
               <div className="mt-3">
                 <FileViewer
                   runId={runId}
                   filePath={selectedFile}
+                  liveContent={fileContents[selectedFile]}
                   onClose={() => setSelectedFile(null)}
                 />
               </div>

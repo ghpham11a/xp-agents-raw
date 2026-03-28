@@ -308,13 +308,15 @@ async def run_agent_streaming(
                         },
                     }
 
-                    # If a file was written/updated, yield file_update
+                    # If a file was written/updated, yield file_update with content
                     if block.name in ("write_file", "append_file"):
+                        file_path = block.input.get("path", "")
                         yield {
                             "type": "file_update",
                             "data": {
-                                "path": block.input.get("path", ""),
+                                "path": file_path,
                                 "action": "created" if block.name == "write_file" else "updated",
+                                "content": scratchpad.read_file(file_path),
                             },
                         }
                     elif block.name == "delete_file":
@@ -323,9 +325,14 @@ async def run_agent_streaming(
                             "data": {"path": block.input.get("path", ""), "action": "deleted"},
                         }
                     elif block.name == "move_file":
+                        dst_path = block.input.get("dst", "")
                         yield {
                             "type": "file_update",
-                            "data": {"path": block.input.get("dst", ""), "action": "created"},
+                            "data": {
+                                "path": dst_path,
+                                "action": "created",
+                                "content": scratchpad.read_file(dst_path),
+                            },
                         }
 
                 except Exception as e:

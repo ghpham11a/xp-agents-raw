@@ -61,6 +61,7 @@ export interface FileUpdateEvent {
   data: {
     path: string;
     action: "created" | "updated" | "deleted";
+    content?: string;
   };
 }
 
