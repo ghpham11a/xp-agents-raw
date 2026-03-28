@@ -69,8 +69,7 @@ def run_planner(task: str, scratchpad: AgentScratchpad, client: anthropic.Anthro
     logger.info(f"Plan written to memory scratchpad.")
     return plan
 
-def load_plan(scratchpad: AgentScratchpad) -> Plan:
-    content = scratchpad.read_file("notes/plan.md")
+def parse_plan_md(content: str) -> Plan:
     lines = content.splitlines()
     goal, steps, done_when, out_files, section = "", [], "", [], None
     for line in lines:
@@ -83,3 +82,8 @@ def load_plan(scratchpad: AgentScratchpad) -> Plan:
         elif line.strip() and section == "done":              done_when = line.strip()
         elif line.startswith("- ") and section == "files":    out_files.append(line[2:].strip())
     return Plan(goal=goal, steps=steps, done_when=done_when, output_files=out_files)
+
+
+def load_plan(scratchpad: AgentScratchpad) -> Plan:
+    content = scratchpad.read_file("notes/plan.md")
+    return parse_plan_md(content)
