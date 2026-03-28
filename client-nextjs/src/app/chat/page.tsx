@@ -28,7 +28,7 @@ export default function ChatIndexPage() {
   );
 
   return (
-    <div className="flex h-screen bg-zinc-950 text-zinc-100">
+    <div className="flex h-screen bg-od-bg-dark text-od-text">
       {/* Sidebar */}
       <div className="shrink-0">
         <ConversationList
@@ -43,14 +43,14 @@ export default function ChatIndexPage() {
       </div>
 
       {/* Empty state */}
-      <div className="flex-1 flex items-center justify-center">
+      <div className="flex-1 flex items-center justify-center bg-od-bg">
         <div className="text-center">
-          <div className="text-5xl mb-4">&#x1F916;</div>
-          <h1 className="text-2xl font-semibold text-zinc-200 mb-2">Agent Chat</h1>
-          <p className="text-zinc-500 mb-6">Start a new conversation to work with the agent.</p>
+          <div className="text-4xl mb-4 text-od-muted opacity-40">&#9002;</div>
+          <h1 className="text-xl font-semibold text-od-text-bright mb-2">Agent Chat</h1>
+          <p className="text-od-muted mb-6 text-sm">Start a new conversation to work with the agent.</p>
           <button
             onClick={handleNewChat}
-            className="rounded-xl bg-blue-600 px-6 py-3 text-sm font-medium text-white hover:bg-blue-500 transition-colors"
+            className="rounded bg-od-blue/15 border border-od-blue/30 px-6 py-2.5 text-sm font-medium text-od-blue hover:bg-od-blue/25 transition-colors"
           >
             + New Chat
           </button>

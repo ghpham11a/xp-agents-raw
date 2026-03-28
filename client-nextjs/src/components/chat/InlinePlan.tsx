@@ -37,16 +37,16 @@ export default function InlinePlan({ runId }: InlinePlanProps) {
   if (!plan && files.length === 0) return null;
 
   return (
-    <div className="mt-3 border-t border-zinc-700 pt-2 space-y-2">
+    <div className="mt-3 border-t border-od-border-light pt-2 space-y-2">
       {/* Plan toggle */}
       {plan && (
         <div>
           <button
             onClick={() => setPlanExpanded(!planExpanded)}
-            className="flex items-center gap-1.5 text-xs text-zinc-500 hover:text-zinc-300 transition-colors"
+            className="flex items-center gap-1.5 text-xs text-od-muted hover:text-od-text transition-colors"
           >
             <span
-              className="inline-block transition-transform"
+              className="inline-block transition-transform text-[10px]"
               style={{ transform: planExpanded ? "rotate(90deg)" : "rotate(0deg)" }}
             >
               &#9654;
@@ -66,10 +66,10 @@ export default function InlinePlan({ runId }: InlinePlanProps) {
         <div>
           <button
             onClick={() => setFilesExpanded(!filesExpanded)}
-            className="flex items-center gap-1.5 text-xs text-zinc-500 hover:text-zinc-300 transition-colors"
+            className="flex items-center gap-1.5 text-xs text-od-muted hover:text-od-text transition-colors"
           >
             <span
-              className="inline-block transition-transform"
+              className="inline-block transition-transform text-[10px]"
               style={{ transform: filesExpanded ? "rotate(90deg)" : "rotate(0deg)" }}
             >
               &#9654;
@@ -82,10 +82,10 @@ export default function InlinePlan({ runId }: InlinePlanProps) {
                 <button
                   key={f.path}
                   onClick={() => setSelectedFile(selectedFile === f.path ? null : f.path)}
-                  className={`w-full text-left text-xs font-mono px-3 py-2 rounded-lg transition-colors ${
+                  className={`w-full text-left text-xs font-mono px-3 py-1.5 rounded transition-colors ${
                     selectedFile === f.path
-                      ? "bg-zinc-700 text-zinc-100"
-                      : "text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200"
+                      ? "bg-od-bg-highlight text-od-text-bright"
+                      : "text-od-muted hover:bg-od-bg-light hover:text-od-text"
                   }`}
                 >
                   {f.path}

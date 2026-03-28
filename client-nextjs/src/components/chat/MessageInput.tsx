@@ -41,7 +41,7 @@ export default function MessageInput({ onSend, disabled = false }: MessageInputP
   }, []);
 
   return (
-    <div className="flex items-end gap-3 p-4 border-t border-zinc-700 bg-zinc-900">
+    <div className="flex items-end gap-3 p-4 border-t border-od-border bg-od-bg-dark">
       <textarea
         ref={textareaRef}
         value={text}
@@ -51,12 +51,12 @@ export default function MessageInput({ onSend, disabled = false }: MessageInputP
         placeholder="Type a message..."
         disabled={disabled}
         rows={1}
-        className="flex-1 resize-none rounded-xl bg-zinc-800 border border-zinc-600 px-4 py-3 text-sm text-zinc-100 placeholder-zinc-500 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 disabled:opacity-50"
+        className="flex-1 resize-none rounded bg-od-bg border border-od-border-light px-4 py-3 text-sm text-od-text placeholder-od-muted focus:outline-none focus:border-od-blue transition-colors disabled:opacity-50"
       />
       <button
         onClick={handleSend}
         disabled={disabled || !text.trim()}
-        className="shrink-0 rounded-xl bg-blue-600 px-5 py-3 text-sm font-medium text-white hover:bg-blue-500 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+        className="shrink-0 rounded bg-od-blue/20 border border-od-blue/30 px-5 py-3 text-sm font-medium text-od-blue hover:bg-od-blue/30 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
       >
         Send
       </button>

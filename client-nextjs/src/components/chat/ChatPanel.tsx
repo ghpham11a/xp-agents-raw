@@ -32,14 +32,14 @@ export default function ChatPanel({
   }, [messages, streamingText, toolCalls]);
 
   return (
-    <div className="flex flex-col h-full bg-zinc-950">
+    <div className="flex flex-col h-full bg-od-bg">
       {/* Message thread */}
       <div ref={scrollRef} className="flex-1 overflow-y-auto p-6 space-y-1">
         {messages.length === 0 && !isStreaming && (
           <div className="flex-1 flex items-center justify-center h-full">
-            <div className="text-center text-zinc-500">
-              <div className="text-4xl mb-3">&#x1f4ac;</div>
-              <p className="text-lg font-medium">Start a conversation</p>
+            <div className="text-center text-od-muted">
+              <div className="text-4xl mb-3 opacity-40">&#9002;</div>
+              <p className="text-base font-medium text-od-text">Start a conversation</p>
               <p className="text-sm mt-1">Send a message to begin working with the agent.</p>
             </div>
           </div>
@@ -51,14 +51,14 @@ export default function ChatPanel({
 
         {/* Tool calls during streaming */}
         {isStreaming && toolCalls.length > 0 && (
-          <div className="mb-4 space-y-2">
+          <div className="mb-4 space-y-1.5">
             {toolCalls.map((tc, i) => (
-              <div key={i} className="flex items-start gap-2 text-xs text-zinc-500 pl-2">
-                <span className="shrink-0 mt-0.5 w-1.5 h-1.5 rounded-full bg-emerald-500" />
+              <div key={i} className="flex items-start gap-2 text-xs text-od-muted pl-2">
+                <span className="shrink-0 mt-0.5 w-1.5 h-1.5 rounded-full bg-od-green" />
                 <span>
-                  <span className="font-mono text-zinc-400">{tc.tool}</span>
+                  <span className="font-mono text-od-green">{tc.tool}</span>
                   {"path" in tc.input && tc.input.path != null && (
-                    <span className="text-zinc-600 ml-1">({String(tc.input.path)})</span>
+                    <span className="text-od-muted ml-1">({String(tc.input.path)})</span>
                   )}
                 </span>
               </div>
@@ -74,12 +74,12 @@ export default function ChatPanel({
         {/* Streaming indicator with no text yet */}
         {isStreaming && !streamingText && toolCalls.length === 0 && (
           <div className="flex justify-start mb-4">
-            <div className="bg-zinc-800 border border-zinc-700 rounded-2xl px-4 py-3">
-              <div className="flex items-center gap-2 text-sm text-zinc-400">
+            <div className="bg-od-bg-light border border-od-border-light rounded px-4 py-3">
+              <div className="flex items-center gap-2 text-sm text-od-muted">
                 <span className="flex gap-1">
-                  <span className="w-1.5 h-1.5 rounded-full bg-zinc-500 animate-bounce" style={{ animationDelay: "0ms" }} />
-                  <span className="w-1.5 h-1.5 rounded-full bg-zinc-500 animate-bounce" style={{ animationDelay: "150ms" }} />
-                  <span className="w-1.5 h-1.5 rounded-full bg-zinc-500 animate-bounce" style={{ animationDelay: "300ms" }} />
+                  <span className="w-1.5 h-1.5 rounded-full bg-od-blue animate-bounce" style={{ animationDelay: "0ms" }} />
+                  <span className="w-1.5 h-1.5 rounded-full bg-od-blue animate-bounce" style={{ animationDelay: "150ms" }} />
+                  <span className="w-1.5 h-1.5 rounded-full bg-od-blue animate-bounce" style={{ animationDelay: "300ms" }} />
                 </span>
                 Agent is thinking...
               </div>

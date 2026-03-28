@@ -1,26 +1,38 @@
 @import "tailwindcss";
 
-:root {
-  --background: #09090b;
-  --foreground: #fafafa;
-}
-
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
+  /* Atom One Dark palette */
+  --color-od-bg: #282c34;
+  --color-od-bg-dark: #21252b;
+  --color-od-bg-light: #2c313a;
+  --color-od-bg-highlight: #3e4452;
+  --color-od-border: #181a1f;
+  --color-od-border-light: #3e4452;
+  --color-od-text: #abb2bf;
+  --color-od-text-bright: #d7dae0;
+  --color-od-muted: #5c6370;
+  --color-od-blue: #61afef;
+  --color-od-green: #98c379;
+  --color-od-red: #e06c75;
+  --color-od-yellow: #e5c07b;
+  --color-od-purple: #c678dd;
+  --color-od-cyan: #56b6c2;
+  --color-od-orange: #d19a66;
+
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
+  background: var(--color-od-bg-dark);
+  color: var(--color-od-text);
   font-family: var(--font-sans), system-ui, sans-serif;
 }
 
-/* Scrollbar styling for dark mode */
+/* Scrollbar — VS Code style */
 ::-webkit-scrollbar {
-  width: 6px;
+  width: 8px;
+  height: 8px;
 }
 
 ::-webkit-scrollbar-track {
@@ -28,26 +40,54 @@ body {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #3f3f46;
-  border-radius: 3px;
+  background: var(--color-od-bg-highlight);
+  border-radius: 0;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #52525b;
+  background: var(--color-od-muted);
 }
 
-/* Prose overrides for markdown in dark mode */
+::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+/* Prose overrides for markdown */
 .prose-invert pre {
-  background: #18181b;
-  border: 1px solid #27272a;
-  border-radius: 0.5rem;
+  background: var(--color-od-bg-dark);
+  border: 1px solid var(--color-od-border-light);
+  border-radius: 4px;
 }
 
 .prose-invert code {
-  color: #a5f3fc;
+  color: var(--color-od-cyan);
   font-size: 0.8em;
 }
 
 .prose-invert pre code {
-  color: #d4d4d8;
+  color: var(--color-od-text);
+}
+
+.prose-invert a {
+  color: var(--color-od-blue);
+}
+
+.prose-invert strong {
+  color: var(--color-od-text-bright);
+}
+
+.prose-invert h1,
+.prose-invert h2,
+.prose-invert h3,
+.prose-invert h4 {
+  color: var(--color-od-text-bright);
+}
+
+.prose-invert table th {
+  color: var(--color-od-text-bright);
+}
+
+.prose-invert blockquote {
+  border-left-color: var(--color-od-blue);
+  color: var(--color-od-muted);
 }

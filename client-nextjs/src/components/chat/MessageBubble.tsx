@@ -18,15 +18,15 @@ export default function MessageBubble({ role, content, isStreaming = false, runI
   return (
     <div className={`flex ${isUser ? "justify-end" : "justify-start"} mb-4`}>
       <div
-        className={`max-w-[80%] rounded-2xl px-4 py-3 ${
+        className={`max-w-[80%] rounded px-4 py-3 ${
           isUser
-            ? "bg-blue-600 text-white"
-            : "bg-zinc-800 text-zinc-100 border border-zinc-700"
+            ? "bg-od-blue/15 border border-od-blue/25 text-od-text-bright"
+            : "bg-od-bg-light border border-od-border-light text-od-text"
         }`}
       >
         {/* Label */}
-        <div className={`text-xs font-medium mb-1 ${isUser ? "text-blue-200" : "text-zinc-400"}`}>
-          {isUser ? "You" : "Agent"}
+        <div className={`text-xs font-mono mb-1.5 ${isUser ? "text-od-blue" : "text-od-purple"}`}>
+          {isUser ? "you" : "agent"}
         </div>
 
         {/* Content */}

@@ -38,13 +38,13 @@ export default function FileViewer({ runId, filePath, liveContent, onClose }: Fi
   }, [liveContent, runId, fetchFile]);
 
   return (
-    <div className="border border-zinc-700 rounded-lg overflow-hidden bg-zinc-900">
-      {/* Header */}
-      <div className="flex items-center justify-between px-3 py-2 bg-zinc-800 border-b border-zinc-700">
-        <span className="text-xs font-mono text-zinc-300 truncate">{filePath}</span>
+    <div className="border border-od-border-light rounded overflow-hidden bg-od-bg">
+      {/* Header — VS Code tab style */}
+      <div className="flex items-center justify-between px-3 py-1.5 bg-od-bg-dark border-b border-od-border">
+        <span className="text-xs font-mono text-od-text truncate">{filePath}</span>
         <button
           onClick={onClose}
-          className="text-zinc-500 hover:text-zinc-300 text-sm transition-colors"
+          className="text-od-muted hover:text-od-text text-sm transition-colors ml-2"
         >
           &times;
         </button>
@@ -53,9 +53,9 @@ export default function FileViewer({ runId, filePath, liveContent, onClose }: Fi
       {/* Content */}
       <div className="p-3 max-h-64 overflow-y-auto">
         {loading && content == null ? (
-          <div className="text-xs text-zinc-500">Loading...</div>
+          <div className="text-xs text-od-muted">Loading...</div>
         ) : (
-          <pre className="text-xs text-zinc-300 font-mono whitespace-pre-wrap break-words leading-relaxed">
+          <pre className="text-xs text-od-text font-mono whitespace-pre-wrap break-words leading-relaxed">
             {content}
           </pre>
         )}
