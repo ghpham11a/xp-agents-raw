@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { streamMessage } from "@/lib/api";
 import type { Plan, SSEEvent, FileInfo } from "@/lib/types";
 
@@ -45,17 +45,66 @@ export function useAgentStream() {
   const [state, setState] = useState<AgentStreamState>(INITIAL_STATE);
   const abortRef = useRef<AbortController | null>(null);
 
+  // Buffer text deltas and flush once per animation frame
+  const textBufferRef = useRef("");
+  const planBufferRef = useRef("");
+  const rafRef = useRef<number | null>(null);
+
+  const flushBuffers = useCallback(() => {
+    const textChunk = textBufferRef.current;
+    const planChunk = planBufferRef.current;
+    textBufferRef.current = "";
+    planBufferRef.current = "";
+    rafRef.current = null;
+
+    if (textChunk || planChunk) {
+      setState((prev) => ({
+        ...prev,
+        ...(textChunk ? { streamingText: prev.streamingText + textChunk } : {}),
+        ...(planChunk ? { planStreamText: prev.planStreamText + planChunk } : {}),
+      }));
+    }
+  }, []);
+
+  const scheduleFlush = useCallback(() => {
+    if (rafRef.current == null) {
+      rafRef.current = requestAnimationFrame(flushBuffers);
+    }
+  }, [flushBuffers]);
+
+  // Clean up any pending raf on unmount
+  useEffect(() => {
+    return () => {
+      if (rafRef.current != null) cancelAnimationFrame(rafRef.current);
+    };
+  }, []);
+
   const processEvent = useCallback((event: SSEEvent) => {
+    // Buffer text deltas instead of triggering a render per token
+    if (event.type === "text_delta") {
+      textBufferRef.current += event.data.content;
+      scheduleFlush();
+      return;
+    }
+    if (event.type === "plan_delta") {
+      planBufferRef.current += event.data.content;
+      scheduleFlush();
+      return;
+    }
+
+    // Flush any buffered text before processing other events
+    if (textBufferRef.current || planBufferRef.current) {
+      if (rafRef.current != null) {
+        cancelAnimationFrame(rafRef.current);
+        rafRef.current = null;
+      }
+      flushBuffers();
+    }
+
     setState((prev) => {
       switch (event.type) {
-        case "plan_delta":
-          return { ...prev, planStreamText: prev.planStreamText + event.data.content };
-
         case "plan":
           return { ...prev, plan: event.data, planStreamText: "" };
-
-        case "text_delta":
-          return { ...prev, streamingText: prev.streamingText + event.data.content };
 
         case "tool_call":
           return { ...prev, toolCalls: [...prev.toolCalls, event.data] };
@@ -90,7 +139,7 @@ export function useAgentStream() {
           return prev;
       }
     });
-  }, []);
+  }, [scheduleFlush, flushBuffers]);
 
   const sendMessage = useCallback(
     async (conversationId: string, content: string) => {

@@ -5,7 +5,8 @@
       "Bash(cd:*)",
       "Bash(sleep:*)",
       "Bash(netstat:*)",
-      "Bash(source:*)"
+      "Bash(source:*)",
+      "Bash(npx tsc:*)"
     ]
   }
 }
