@@ -9,7 +9,7 @@ import anthropic
 
 from agent.agent_config import AgentConfig
 from agent.agent_state import AgentState
-from agent.agent_planner import Plan, load_plan
+from agent.agent_planner import Plan, load_plan, run_planner_async
 from agent.agent_memory import AgentMemory, MEMORY_TOOL_DEFINITIONS
 from agent.agent_scratchpad import AgentScratchpad, SCRATCHPAD_TOOL_DEFINITIONS
 from agent.agent_guardrails import (
@@ -18,79 +18,6 @@ from agent.agent_guardrails import (
 )
 
 logger = logging.getLogger(__name__)
-
-# ============================================================
-# STREAMING PLANNER
-# ============================================================
-
-async def run_planner_streaming(
-    task: str,
-    scratchpad: AgentScratchpad,
-    client: anthropic.AsyncAnthropic,
-) -> AsyncGenerator[dict, None]:
-    """
-    Stream the plan as it's generated, then yield the final structured plan.
-    Yields plan_delta events during generation, then a plan event at the end.
-    """
-    JSON_EXAMPLE = json.dumps(
-        {
-            "goal": "one sentence goal",
-            "steps": ["step 1", "step 2", "step 3"],
-            "done_when": "clear completion condition referencing output files",
-            "output_files": ["output/filename.md"],
-        },
-        indent=4,
-    )
-
-    PLANNER_SYSTEM_PROMPT = (
-        f"You are a planning agent. Given a task, return ONLY valid JSON with no preamble:\n{JSON_EXAMPLE}\n"
-        "No preamble, no markdown, just the JSON object."
-    )
-
-    accumulated_text = ""
-
-    async with client.messages.stream(
-        model="claude-haiku-4-5",
-        max_tokens=800,
-        system=PLANNER_SYSTEM_PROMPT,
-        messages=[{"role": "user", "content": f"Plan this task: {task}"}],
-    ) as stream:
-        async for event in stream:
-            if event.type == "content_block_delta" and event.delta.type == "text_delta":
-                accumulated_text += event.delta.text
-                yield {"type": "plan_delta", "data": {"content": event.delta.text}}
-
-    # Parse the completed plan
-    try:
-        data = json.loads(accumulated_text)
-        plan = Plan(**data)
-    except (json.JSONDecodeError, TypeError):
-        plan = Plan(
-            goal=task,
-            steps=["Research the topic", "Write findings", "Save to output/report.md"],
-            done_when="output/report.md exists with complete content",
-            output_files=["output/report.md"],
-        )
-
-    # Write plan to scratchpad
-    plan_md = (
-        "# Plan\n\n"
-        f"## Goal\n{plan.goal}\n\n"
-        f"## Steps\n{chr(10).join(f'- [ ] {s}' for s in plan.steps)}\n\n"
-        f"## Done When\n{plan.done_when}\n\n"
-        f"## Expected Output Files\n{chr(10).join(f'- {f}' for f in plan.output_files)}"
-    )
-    scratchpad.write_file("notes/plan.md", plan_md)
-
-    yield {
-        "type": "plan",
-        "data": {
-            "goal": plan.goal,
-            "steps": plan.steps,
-            "done_when": plan.done_when,
-            "output_files": plan.output_files,
-        },
-    }
 
 
 # ============================================================
@@ -129,10 +56,18 @@ async def run_agent_streaming(
     # ----------------------------------------------------------
     guard_result = input_guard.check(task)
     if guard_result.action == GuardrailAction.BLOCK:
+        logger.warning(f"Input blocked: {guard_result.reason}")
         yield {"type": "error", "data": {"message": f"Request blocked: {guard_result.reason}"}}
         return
     if guard_result.action == GuardrailAction.MODIFY:
+        logger.info(f"Input modified: {guard_result.reason}")
         task = guard_result.modified_content
+
+    if config.use_llm_input_guard:
+        llm_result = input_guard.llm_check(task)
+        if llm_result.action == GuardrailAction.BLOCK:
+            logger.warning(f"LLM input blocked: {llm_result.reason}")
+            return f"Request blocked: {llm_result.reason}"
 
     # ----------------------------------------------------------
     # SETUP — scratchpad, state, plan
@@ -141,21 +76,21 @@ async def run_agent_streaming(
         scratchpad = AgentScratchpad(run_id=resume_run_id, base_dir=base_dir)
         state = AgentState.load(scratchpad)
         plan = load_plan(scratchpad)
+        logger.info(f"Resuming run {state.run_id}")
     else:
         scratchpad = AgentScratchpad(run_id=str(uuid.uuid4())[:8], base_dir=base_dir)
         state = AgentState(run_id=scratchpad.run_id)
 
-        # Stream the plan generation
-        async for event in run_planner_streaming(task, scratchpad, client):
-            yield event
-            if event["type"] == "plan":
-                plan_data = event["data"]
-                plan = Plan(
-                    goal=plan_data["goal"],
-                    steps=plan_data["steps"],
-                    done_when=plan_data["done_when"],
-                    output_files=plan_data["output_files"],
-                )
+        plan = await run_planner_async(task, scratchpad, client)
+        yield {
+            "type": "plan",
+            "data": {
+                "goal": plan.goal,
+                "steps": plan.steps,
+                "done_when": plan.done_when,
+                "output_files": plan.output_files,
+            },
+        }
 
     all_tools = {
         **tools,
@@ -247,7 +182,12 @@ async def run_agent_streaming(
                         break
 
                 out_result = output_guard.check(final_text)
+                if out_result.action == GuardrailAction.BLOCK:
+                    logger.warning("Output blocked by guardrail")
+                    yield {"type": "error", "data": {"message": "Response blocked by output policy."}}
+                    return 
                 if out_result.action == GuardrailAction.MODIFY:
+                    logger.info(f"Output modified: {out_result.reason}")
                     final_text = out_result.modified_content
 
                 state.status = "complete"
@@ -279,6 +219,7 @@ async def run_agent_streaming(
                 # Tool guardrail
                 tool_check = tool_guard.check(block.name, block.input)
                 if tool_check.action == GuardrailAction.BLOCK:
+                    logger.warning(f"Tool blocked: {tool_check.reason}")
                     tool_results.append({
                         "type": "tool_result",
                         "tool_use_id": block.id,

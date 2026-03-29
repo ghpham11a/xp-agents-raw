@@ -32,11 +32,6 @@ export interface Plan {
 
 // ── SSE Event types ──────────────────────────────────────
 
-export interface PlanDeltaEvent {
-  type: "plan_delta";
-  data: { content: string };
-}
-
 export interface PlanEvent {
   type: "plan";
   data: Plan;
@@ -81,7 +76,6 @@ export interface ErrorEvent {
 }
 
 export type SSEEvent =
-  | PlanDeltaEvent
   | PlanEvent
   | TextDeltaEvent
   | ToolCallEvent

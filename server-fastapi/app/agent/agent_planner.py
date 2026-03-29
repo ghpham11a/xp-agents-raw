@@ -2,6 +2,7 @@ import logging
 import json
 
 from dataclasses import dataclass
+from typing import Optional
 
 import anthropic
 
@@ -10,10 +11,6 @@ from agent.agent_scratchpad import AgentScratchpad
 
 logger = logging.getLogger(__name__)
 
-# ============================================================
-# PLANNER AGENT
-# ============================================================
-
 @dataclass
 class Plan:
     goal: str
@@ -21,6 +18,9 @@ class Plan:
     done_when: str
     output_files: list[str]
 
+# ============================================================
+# PLANNER AGENT
+# ============================================================
 
 def run_planner(task: str, scratchpad: AgentScratchpad, client: anthropic.Anthropic) -> Plan:
     logger.info("Running planner...")
@@ -68,6 +68,68 @@ def run_planner(task: str, scratchpad: AgentScratchpad, client: anthropic.Anthro
     scratchpad.write_file("notes/plan.md", plan_md)
     logger.info(f"Plan written to memory scratchpad.")
     return plan
+
+# ============================================================
+# ASYNC PLANNER (non-streaming)
+# ============================================================
+
+async def run_planner_async(
+    task: str,
+    scratchpad: AgentScratchpad,
+    client: anthropic.AsyncAnthropic,
+) -> Plan:
+    """
+    Async version of run_planner(). Awaits the full response and returns a Plan.
+    """
+    logger.info("Running planner...")
+
+    JSON_EXAMPLE = json.dumps(
+        {
+            "goal": "one sentence goal",
+            "steps": ["step 1", "step 2", "step 3"],
+            "done_when": "clear completion condition referencing output files",
+            "output_files": ["output/filename.md"],
+        },
+        indent=4,
+    )
+
+    PLANNER_SYSTEM_PROMPT = (
+        f"You are a planning agent. Given a task, return ONLY valid JSON with no preamble:\n{JSON_EXAMPLE}\n"
+        "No preamble, no markdown, just the JSON object."
+    )
+
+    response = await client.messages.create(
+        model="claude-haiku-4-5",
+        max_tokens=800,
+        system=PLANNER_SYSTEM_PROMPT,
+        messages=[{"role": "user", "content": f"Plan this task: {task}"}],
+    )
+
+    try:
+        data = json.loads(response.content[0].text)
+        plan = Plan(**data)
+    except (json.JSONDecodeError, TypeError):
+        plan = Plan(
+            goal=task,
+            steps=["Research the topic", "Write findings", "Save to output/report.md"],
+            done_when="output/report.md exists with complete content",
+            output_files=["output/report.md"],
+        )
+
+    plan_md = (
+        "# Plan\n\n"
+        f"## Goal\n{plan.goal}\n\n"
+        f"## Steps\n{chr(10).join(f'- [ ] {s}' for s in plan.steps)}\n\n"
+        f"## Done When\n{plan.done_when}\n\n"
+        f"## Expected Output Files\n{chr(10).join(f'- {f}' for f in plan.output_files)}"
+    )
+    scratchpad.write_file("notes/plan.md", plan_md)
+    logger.info("Plan written to scratchpad.")
+    return plan
+
+# ============================================================
+# HELPERS
+# ============================================================
 
 def parse_plan_md(content: str) -> Plan:
     lines = content.splitlines()

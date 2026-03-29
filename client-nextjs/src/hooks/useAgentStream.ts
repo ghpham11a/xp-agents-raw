@@ -17,7 +17,7 @@ export interface AgentStreamState {
 
   // Plan
   plan: Plan | null;
-  planStreamText: string;
+
 
   // Files
   files: FileInfo[];
@@ -33,7 +33,7 @@ const INITIAL_STATE: AgentStreamState = {
   streamingText: "",
   isStreaming: false,
   plan: null,
-  planStreamText: "",
+
   files: [],
   fileContents: {},
   toolCalls: [],
@@ -47,21 +47,17 @@ export function useAgentStream() {
 
   // Buffer text deltas and flush once per animation frame
   const textBufferRef = useRef("");
-  const planBufferRef = useRef("");
   const rafRef = useRef<number | null>(null);
 
   const flushBuffers = useCallback(() => {
     const textChunk = textBufferRef.current;
-    const planChunk = planBufferRef.current;
     textBufferRef.current = "";
-    planBufferRef.current = "";
     rafRef.current = null;
 
-    if (textChunk || planChunk) {
+    if (textChunk) {
       setState((prev) => ({
         ...prev,
-        ...(textChunk ? { streamingText: prev.streamingText + textChunk } : {}),
-        ...(planChunk ? { planStreamText: prev.planStreamText + planChunk } : {}),
+        streamingText: prev.streamingText + textChunk,
       }));
     }
   }, []);
@@ -86,14 +82,8 @@ export function useAgentStream() {
       scheduleFlush();
       return;
     }
-    if (event.type === "plan_delta") {
-      planBufferRef.current += event.data.content;
-      scheduleFlush();
-      return;
-    }
-
     // Flush any buffered text before processing other events
-    if (textBufferRef.current || planBufferRef.current) {
+    if (textBufferRef.current) {
       if (rafRef.current != null) {
         cancelAnimationFrame(rafRef.current);
         rafRef.current = null;
@@ -104,7 +94,7 @@ export function useAgentStream() {
     setState((prev) => {
       switch (event.type) {
         case "plan":
-          return { ...prev, plan: event.data, planStreamText: "" };
+          return { ...prev, plan: event.data };
 
         case "tool_call":
           return { ...prev, toolCalls: [...prev.toolCalls, event.data] };

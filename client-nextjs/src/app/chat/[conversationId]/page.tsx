@@ -30,7 +30,6 @@ export default function ConversationPage() {
     isStreaming,
     toolCalls,
     plan,
-    planStreamText,
     files,
     fileContents,
     runId,
@@ -120,7 +119,7 @@ export default function ConversationPage() {
       <div className="w-80 shrink-0">
         <PlanPanel
           plan={plan}
-          planStreamText={planStreamText}
+
           isStreaming={isStreaming}
           files={files}
           fileContents={fileContents}

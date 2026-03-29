@@ -4,11 +4,9 @@ import { useState } from "react";
 import type { Plan, FileInfo } from "@/lib/types";
 import PlanView from "./PlanView";
 import FileViewer from "./FileViewer";
-import StreamingText from "../chat/StreamingText";
 
 interface PlanPanelProps {
   plan: Plan | null;
-  planStreamText: string;
   isStreaming: boolean;
   files: FileInfo[];
   fileContents: Record<string, string>;
@@ -17,15 +15,12 @@ interface PlanPanelProps {
 
 export default function PlanPanel({
   plan,
-  planStreamText,
   isStreaming,
   files,
   fileContents,
   runId,
 }: PlanPanelProps) {
   const [selectedFile, setSelectedFile] = useState<string | null>(null);
-
-  const hasPlanContent = plan || planStreamText;
 
   return (
     <div className="flex flex-col h-full bg-od-bg-dark border-l border-od-border">
@@ -42,18 +37,11 @@ export default function PlanPanel({
             Plan
           </h2>
 
-          {/* Streaming plan text */}
-          {planStreamText && (
-            <div className="rounded bg-od-bg border border-od-border-light p-3 text-xs font-mono text-od-text leading-relaxed">
-              <StreamingText text={planStreamText} isStreaming={isStreaming} />
-            </div>
-          )}
-
           {/* Structured plan */}
           {plan && <PlanView plan={plan} />}
 
           {/* Empty state */}
-          {!hasPlanContent && (
+          {!plan && (
             <div className="text-xs text-od-muted italic">
               No plan yet. Send a message to start.
             </div>
