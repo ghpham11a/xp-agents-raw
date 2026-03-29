@@ -14,6 +14,7 @@ CREATE TABLE IF NOT EXISTS messages (
     content         TEXT NOT NULL,      -- The message text
     run_id          TEXT,              -- Links to agent_runs/{run_id}/ (NULL for user msgs)
     token_count     INTEGER,           -- Tokens used for this response
+    tool_calls      TEXT,              -- JSON array of tool calls (NULL for user msgs)
     created_at      TEXT NOT NULL,
 
     FOREIGN KEY (conversation_id) REFERENCES conversations(id)

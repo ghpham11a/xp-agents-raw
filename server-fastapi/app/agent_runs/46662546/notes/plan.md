@@ -1,7 +1,7 @@
 # Plan
 
 ## Goal
-What is an LLM
+What is blockchain
 
 ## Steps
 - [ ] Research the topic

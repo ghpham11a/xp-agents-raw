@@ -11,22 +11,14 @@ from pydantic import BaseModel
 from db.database import get_db
 from db import queries
 from api.streaming import sse_generator
-from agent.agent_streaming import run_agent_streaming
+from agent.agent_root_streaming import run_agent_streaming, submit_approval
+from schema import CreateConversationRequest, SendMessageRequest, ApprovalRequest
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api")
 
 BASE_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "app", "agent_runs")
-
-
-# ── Request / Response models ─────────────────────────────
-
-class CreateConversationRequest(BaseModel):
-    title: str = "New conversation"
-
-class SendMessageRequest(BaseModel):
-    content: str
 
 
 # ── Conversations ─────────────────────────────────────────
@@ -114,12 +106,15 @@ async def send_message(conversation_id: str, req: SendMessageRequest):
         final_text = ""
         run_id = None
         total_tokens = None
+        tool_calls = []
 
         async for event in run_agent_streaming(task=task, base_dir=BASE_DIR):
             yield event
 
             if event["type"] == "text_delta":
                 final_text += event["data"]["content"]
+            elif event["type"] == "tool_call":
+                tool_calls.append(event["data"])
             elif event["type"] == "done":
                 run_id = event["data"].get("run_id")
                 total_tokens = event["data"].get("total_tokens")
@@ -134,6 +129,7 @@ async def send_message(conversation_id: str, req: SendMessageRequest):
                 queries.add_message(
                     db, conversation_id, "assistant", final_text,
                     run_id=run_id, token_count=total_tokens,
+                    tool_calls=tool_calls or None,
                 )
             finally:
                 db.close()
@@ -147,6 +143,16 @@ async def send_message(conversation_id: str, req: SendMessageRequest):
             "X-Accel-Buffering": "no",
         },
     )
+
+
+# ── Human-in-the-loop Approval ────────────────────────────
+
+@router.post("/runs/{run_id}/approval")
+async def handle_approval(run_id: str, req: ApprovalRequest):
+    """Submit a human approval decision for a pending tool call."""
+    if not submit_approval(run_id, req.approved):
+        raise HTTPException(status_code=404, detail="No pending approval for this run")
+    return {"ok": True}
 
 
 # ── Agent Run Files ───────────────────────────────────────

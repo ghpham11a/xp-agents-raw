@@ -47,16 +47,26 @@ export async function getRunPlan(runId: string): Promise<import("./types").Plan 
   }
 }
 
+export async function submitApproval(runId: string, approved: boolean): Promise<void> {
+  await fetch(`${API_BASE}/runs/${runId}/approval`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ approved }),
+  });
+}
+
 // ── SSE streaming ─────────────────────────────────────────
 
 export async function* streamMessage(
   conversationId: string,
   content: string,
+  signal?: AbortSignal,
 ): AsyncGenerator<SSEEvent> {
   const response = await fetch(`${API_BASE}/conversations/${conversationId}/messages`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ content }),
+    signal,
   });
 
   if (!response.ok) {

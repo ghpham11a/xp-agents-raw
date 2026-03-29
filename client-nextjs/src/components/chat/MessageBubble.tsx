@@ -4,15 +4,17 @@ import Markdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import StreamingText from "./StreamingText";
 import InlinePlan from "./InlinePlan";
+import type { ToolCallRecord } from "@/lib/types";
 
 interface MessageBubbleProps {
   role: "user" | "assistant";
   content: string;
   isStreaming?: boolean;
   runId?: string | null;
+  toolCalls?: ToolCallRecord[] | null;
 }
 
-export default function MessageBubble({ role, content, isStreaming = false, runId }: MessageBubbleProps) {
+export default function MessageBubble({ role, content, isStreaming = false, runId, toolCalls: toolCallsProp }: MessageBubbleProps) {
   const isUser = role === "user";
 
   return (
@@ -40,8 +42,10 @@ export default function MessageBubble({ role, content, isStreaming = false, runI
           </div>
         )}
 
-        {/* Inline plan for historical assistant messages */}
-        {!isStreaming && !isUser && runId && <InlinePlan runId={runId} />}
+        {/* Inline plan + tool calls for historical assistant messages */}
+        {!isStreaming && !isUser && runId && (
+          <InlinePlan runId={runId} toolCalls={toolCallsProp} />
+        )}
       </div>
     </div>
   );

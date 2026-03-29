@@ -4,10 +4,12 @@ import { useState, useRef, useCallback } from "react";
 
 interface MessageInputProps {
   onSend: (content: string) => void;
-  disabled?: boolean;
+  isStreaming?: boolean;
+  onStop?: () => void;
 }
 
-export default function MessageInput({ onSend, disabled = false }: MessageInputProps) {
+export default function MessageInput({ onSend, isStreaming = false, onStop }: MessageInputProps) {
+  const disabled = isStreaming;
   const [text, setText] = useState("");
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -53,13 +55,22 @@ export default function MessageInput({ onSend, disabled = false }: MessageInputP
         rows={1}
         className="flex-1 resize-none rounded bg-od-bg border border-od-border-light px-4 py-3 text-sm text-od-text placeholder-od-muted focus:outline-none focus:border-od-blue transition-colors disabled:opacity-50"
       />
-      <button
-        onClick={handleSend}
-        disabled={disabled || !text.trim()}
-        className="shrink-0 rounded bg-od-blue/20 border border-od-blue/30 px-5 py-3 text-sm font-medium text-od-blue hover:bg-od-blue/30 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-      >
-        Send
-      </button>
+      {isStreaming ? (
+        <button
+          onClick={onStop}
+          className="shrink-0 rounded bg-od-red/20 border border-od-red/30 px-5 py-3 text-sm font-medium text-od-red hover:bg-od-red/30 transition-colors"
+        >
+          Stop
+        </button>
+      ) : (
+        <button
+          onClick={handleSend}
+          disabled={!text.trim()}
+          className="shrink-0 rounded bg-od-blue/20 border border-od-blue/30 px-5 py-3 text-sm font-medium text-od-blue hover:bg-od-blue/30 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+        >
+          Send
+        </button>
+      )}
     </div>
   );
 }

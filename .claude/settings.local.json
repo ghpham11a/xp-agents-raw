@@ -6,7 +6,8 @@
       "Bash(sleep:*)",
       "Bash(netstat:*)",
       "Bash(source:*)",
-      "Bash(npx tsc:*)"
+      "Bash(npx tsc:*)",
+      "Bash(npm run:*)"
     ]
   }
 }

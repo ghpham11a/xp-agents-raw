@@ -33,7 +33,10 @@ export default function ConversationPage() {
     files,
     fileContents,
     runId,
+    pendingApproval,
     sendMessage,
+    stop,
+    respondToApproval,
     reset,
   } = useAgentStream();
 
@@ -67,6 +70,7 @@ export default function ConversationPage() {
         content,
         run_id: null,
         token_count: null,
+        tool_calls: null,
         created_at: new Date().toISOString(),
       };
       addMessage(optimisticMsg);
@@ -111,7 +115,10 @@ export default function ConversationPage() {
           streamingText={streamingText}
           isStreaming={isStreaming}
           toolCalls={toolCalls}
+          pendingApproval={pendingApproval}
           onSend={handleSend}
+          onStop={stop}
+          onApproval={respondToApproval}
         />
       </div>
 

@@ -7,6 +7,12 @@ export interface Conversation {
   updated_at: string;
 }
 
+export interface ToolCallRecord {
+  tool: string;
+  input: Record<string, unknown>;
+  result: string;
+}
+
 export interface Message {
   id: string;
   conversation_id: string;
@@ -14,6 +20,7 @@ export interface Message {
   content: string;
   run_id: string | null;
   token_count: number | null;
+  tool_calls: ToolCallRecord[] | null;
   created_at: string;
 }
 
@@ -60,6 +67,15 @@ export interface FileUpdateEvent {
   };
 }
 
+export interface ApprovalRequestEvent {
+  type: "approval_request";
+  data: {
+    run_id: string;
+    tool: string;
+    input: Record<string, unknown>;
+  };
+}
+
 export interface DoneEvent {
   type: "done";
   data: {
@@ -80,6 +96,7 @@ export type SSEEvent =
   | TextDeltaEvent
   | ToolCallEvent
   | FileUpdateEvent
+  | ApprovalRequestEvent
   | DoneEvent
   | ErrorEvent;
 

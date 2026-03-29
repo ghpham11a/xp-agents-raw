@@ -34,8 +34,17 @@ def get_db_connection():
 
 
 def init_db():
-    """Read schema.sql and execute it. Called once at startup."""
+    """Read schema.sql and execute it, then run migrations. Called once at startup."""
     schema = SCHEMA_PATH.read_text()
     with get_db_connection() as conn:
         conn.executescript(schema)
+        _migrate(conn)
     logger.info(f"Database initialized at {DB_PATH}")
+
+
+def _migrate(conn: sqlite3.Connection):
+    """Add columns that may be missing from older databases."""
+    columns = {row[1] for row in conn.execute("PRAGMA table_info(messages)").fetchall()}
+    if "tool_calls" not in columns:
+        conn.execute("ALTER TABLE messages ADD COLUMN tool_calls TEXT")
+        logger.info("Migration: added tool_calls column to messages")

@@ -48,7 +48,7 @@ app.include_router(router)
 
 if __name__ == "__main__":
     if "--cli" in sys.argv:
-        from agent.agent import run_agent
+        from agent.agent_root_cli import run_agent
         run_agent(task="What is an LLM. Give me a quick sentence")
     else:
         uvicorn.run("main:app", host="0.0.0.0", port=8005, reload=True)

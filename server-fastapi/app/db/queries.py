@@ -1,3 +1,4 @@
+import json
 import uuid
 import sqlite3
 
@@ -73,13 +74,15 @@ def add_message(
     content: str,
     run_id: str | None = None,
     token_count: int | None = None,
+    tool_calls: list[dict] | None = None,
 ) -> str:
     """Add a message and return its id."""
     message_id = _new_id()
+    tool_calls_json = json.dumps(tool_calls) if tool_calls else None
     db.execute(
-        "INSERT INTO messages (id, conversation_id, role, content, run_id, token_count, created_at) "
-        "VALUES (?, ?, ?, ?, ?, ?, ?)",
-        (message_id, conversation_id, role, content, run_id, token_count, _now()),
+        "INSERT INTO messages (id, conversation_id, role, content, run_id, token_count, tool_calls, created_at) "
+        "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+        (message_id, conversation_id, role, content, run_id, token_count, tool_calls_json, _now()),
     )
     db.commit()
     update_conversation_timestamp(db, conversation_id)
@@ -88,8 +91,13 @@ def add_message(
 
 def get_messages(db: sqlite3.Connection, conversation_id: str) -> list[dict]:
     rows = db.execute(
-        "SELECT id, conversation_id, role, content, run_id, token_count, created_at "
+        "SELECT id, conversation_id, role, content, run_id, token_count, tool_calls, created_at "
         "FROM messages WHERE conversation_id = ? ORDER BY created_at",
         (conversation_id,),
     ).fetchall()
-    return [dict(r) for r in rows]
+    results = []
+    for r in rows:
+        d = dict(r)
+        d["tool_calls"] = json.loads(d["tool_calls"]) if d["tool_calls"] else None
+        results.append(d)
+    return results

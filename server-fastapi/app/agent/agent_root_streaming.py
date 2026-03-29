@@ -1,3 +1,4 @@
+import asyncio
 import logging
 import json
 import time
@@ -18,6 +19,23 @@ from agent.agent_guardrails import (
 )
 
 logger = logging.getLogger(__name__)
+
+# ============================================================
+# HUMAN-IN-THE-LOOP — pending approval queues
+# ============================================================
+
+# Maps run_id → asyncio.Queue for passing approval decisions
+_pending_approvals: dict[str, asyncio.Queue] = {}
+
+
+def submit_approval(run_id: str, approved: bool) -> bool:
+    """Submit a human approval decision for a pending tool call.
+    Returns True if there was a pending approval for this run."""
+    queue = _pending_approvals.get(run_id)
+    if queue is None:
+        return False
+    queue.put_nowait(approved)
+    return True
 
 
 # ============================================================
@@ -67,7 +85,8 @@ async def run_agent_streaming(
         llm_result = input_guard.llm_check(task)
         if llm_result.action == GuardrailAction.BLOCK:
             logger.warning(f"LLM input blocked: {llm_result.reason}")
-            return f"Request blocked: {llm_result.reason}"
+            yield {"type": "error", "data": {"message": f"Request blocked: {llm_result.reason}"}}
+            return
 
     # ----------------------------------------------------------
     # SETUP — scratchpad, state, plan
@@ -227,6 +246,32 @@ async def run_agent_streaming(
                         "is_error": True,
                     })
                     continue
+
+                # Human-in-the-loop
+                if block.name in config.require_human_approval_for:
+                    approval_queue = asyncio.Queue()
+                    _pending_approvals[state.run_id] = approval_queue
+
+                    yield {
+                        "type": "approval_request",
+                        "data": {
+                            "run_id": state.run_id,
+                            "tool": block.name,
+                            "input": block.input,
+                        },
+                    }
+
+                    approved = await approval_queue.get()
+                    _pending_approvals.pop(state.run_id, None)
+
+                    if not approved:
+                        tool_results.append({
+                            "type": "tool_result",
+                            "tool_use_id": block.id,
+                            "content": "Human rejected this action. Try a different approach.",
+                            "is_error": True,
+                        })
+                        continue
 
                 # Execute the tool
                 try:
