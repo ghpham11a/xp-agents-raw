@@ -61,9 +61,25 @@ export default function ConversationPage() {
     }
   }, [isStreaming, streamingText, conversationId, loadConversation, refresh]);
 
+  /**
+   * Handle sending a message — works both when idle AND while streaming.
+   *
+   * When the agent is already streaming a response and the user sends a
+   * new message, we need to:
+   *   1. Save the partial assistant response so it's not lost
+   *   2. Abort the current stream
+   *   3. Add the new user message
+   *   4. Start a fresh stream for the new message
+   *
+   * Steps 2-4 are handled by `sendMessage` in useAgentStream. Step 1 is
+   * handled by the `onInterrupt` callback we pass to `sendMessage` — it
+   * fires with the partial text before the stream state is reset, giving
+   * us a chance to insert it into the message list.
+   */
   const handleSend = useCallback(
     (content: string) => {
-      // Optimistic: add user message to local state immediately
+      // Optimistic: add user message to local state immediately.
+      // We use a temp ID since the real DB id comes from the backend.
       const optimisticMsg: Message = {
         id: `temp-${Date.now()}`,
         conversation_id: conversationId,
@@ -74,8 +90,41 @@ export default function ConversationPage() {
         tool_calls: null,
         created_at: new Date().toISOString(),
       };
+
+      /**
+       * onInterrupt callback — called by sendMessage when there's an
+       * active stream that needs to be interrupted.
+       *
+       * `partialText` contains whatever the agent had streamed so far
+       * (both committed-to-state text and any text still in the RAF
+       * buffer). We insert it as a completed assistant message so the
+       * user can still see what the agent was saying before they
+       * interrupted it.
+       *
+       * Note: This partial message will be replaced with the real
+       * message from the DB on the next reload, but it preserves
+       * continuity in the UI during the transition.
+       */
+      const onInterrupt = (partialText: string) => {
+        const partialAssistantMsg: Message = {
+          id: `partial-${Date.now()}`,
+          conversation_id: conversationId,
+          role: "assistant",
+          // Append a note so the user knows this response was cut short
+          content: partialText + "\n\n*(interrupted)*",
+          run_id: null,
+          token_count: null,
+          tool_calls: null,
+          created_at: new Date().toISOString(),
+        };
+        addMessage(partialAssistantMsg);
+      };
+
+      // Add the user's message to the list, then kick off the stream.
+      // If a stream was in progress, onInterrupt fires first to save
+      // the partial response, then the new stream begins.
       addMessage(optimisticMsg);
-      sendMessage(conversationId, content);
+      sendMessage(conversationId, content, onInterrupt);
     },
     [conversationId, addMessage, sendMessage],
   );

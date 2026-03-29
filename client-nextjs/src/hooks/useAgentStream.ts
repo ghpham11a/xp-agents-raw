@@ -149,29 +149,97 @@ export function useAgentStream() {
     });
   }, [scheduleFlush, flushBuffers]);
 
+  /**
+   * Send a message to the agent and start streaming the response.
+   *
+   * If a stream is already in progress, the previous stream is aborted first.
+   * The optional `onInterrupt` callback fires *before* the state is reset,
+   * receiving whatever partial assistant text has been accumulated so far.
+   * This lets the caller persist the partial response (e.g. add it to the
+   * message list) so it isn't lost when the new stream begins.
+   *
+   * @param conversationId - The conversation to send the message to
+   * @param content        - The user's message text
+   * @param onInterrupt    - Optional callback invoked with the partial
+   *                         streaming text when an in-flight stream is
+   *                         interrupted by this new message
+   */
   const sendMessage = useCallback(
-    async (conversationId: string, content: string) => {
-      // Abort any in-flight stream
-      abortRef.current?.abort();
+    async (
+      conversationId: string,
+      content: string,
+      onInterrupt?: (partialText: string) => void,
+    ) => {
+      // ── Interrupt handling ──────────────────────────────────────
+      // If there's already a stream running, we need to:
+      //   1. Capture any partial text that was accumulated
+      //   2. Notify the caller so they can save it as a message
+      //   3. Abort the underlying fetch/SSE connection
+      if (abortRef.current) {
+        // Flush any buffered text that hasn't been committed to state yet.
+        // The streaming pipeline batches text_delta events via
+        // requestAnimationFrame, so there may be text sitting in the
+        // buffer that setState hasn't picked up yet.
+        const buffered = textBufferRef.current;
+        textBufferRef.current = "";
+        if (rafRef.current != null) {
+          cancelAnimationFrame(rafRef.current);
+          rafRef.current = null;
+        }
+
+        // Read the current streamingText from state synchronously.
+        // We use a setState callback that returns the *same* state
+        // (no re-render) just to peek at the current value — this is
+        // a common React pattern for reading state inside a callback
+        // without adding it to the dependency array.
+        let currentText = "";
+        setState((prev) => {
+          currentText = prev.streamingText;
+          return prev; // no state change, no re-render
+        });
+
+        // Combine committed state text + anything still in the buffer
+        const partialText = currentText + buffered;
+
+        // Let the caller save the partial response before we wipe state
+        if (partialText && onInterrupt) {
+          onInterrupt(partialText);
+        }
+
+        // Abort the previous stream's fetch request
+        abortRef.current.abort();
+      }
+
+      // ── Start new stream ────────────────────────────────────────
       const controller = new AbortController();
       abortRef.current = controller;
 
-      // Reset streaming state for new message
+      // Reset all streaming state for the new message.
+      // This clears streamingText, plan, toolCalls, etc. so the UI
+      // starts fresh for the new response.
       setState({
         ...INITIAL_STATE,
         isStreaming: true,
       });
 
       try {
+        // Consume the SSE async generator. Each yielded event is
+        // dispatched to processEvent which updates the relevant
+        // slice of state (text, plan, tools, files, etc.)
         for await (const event of streamMessage(conversationId, content, controller.signal)) {
           processEvent(event);
         }
       } catch (err) {
-        // Don't treat user-initiated abort as an error
+        // When we abort a stream (either via stop() or by sending a new
+        // message), the fetch promise rejects with an AbortError.
+        // This is expected behavior, not a real error — so we just
+        // mark streaming as finished without showing an error.
         if (controller.signal.aborted) {
           setState((prev) => ({ ...prev, isStreaming: false }));
           return;
         }
+        // For genuine errors (network failure, server error, etc.),
+        // surface the error message in state so the UI can display it.
         setState((prev) => ({
           ...prev,
           isStreaming: false,

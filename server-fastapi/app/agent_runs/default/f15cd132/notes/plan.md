@@ -1,7 +1,7 @@
 # Plan
 
 ## Goal
-In a few sentences, what is Apache Flink?
+What is a Transformer in the context of Deep Learning. Only give me a few sentences.
 
 ## Steps
 - [ ] Research the topic
