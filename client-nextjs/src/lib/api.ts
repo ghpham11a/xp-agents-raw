@@ -1,19 +1,34 @@
-import type { Conversation, ConversationWithMessages, FileInfo, SSEEvent } from "./types";
+import type { Agent, Conversation, ConversationWithMessages, FileInfo, SSEEvent } from "./types";
 
 const API_BASE = "http://localhost:8005/api";
 
-// ── REST endpoints ────────────────────────────────────────
+// ── Agents ───────────────────────────────────────────────
 
-export async function listConversations(): Promise<Conversation[]> {
-  const res = await fetch(`${API_BASE}/conversations`);
+export async function listAgents(): Promise<Agent[]> {
+  const res = await fetch(`${API_BASE}/agents`);
   return res.json();
 }
 
-export async function createConversation(title = "New conversation"): Promise<{ id: string; title: string }> {
+export async function getAgent(id: string): Promise<Agent> {
+  const res = await fetch(`${API_BASE}/agents/${id}`);
+  return res.json();
+}
+
+// ── Conversations ────────────────────────────────────────
+
+export async function listConversations(agentId?: string): Promise<Conversation[]> {
+  const url = agentId
+    ? `${API_BASE}/conversations?agent_id=${encodeURIComponent(agentId)}`
+    : `${API_BASE}/conversations`;
+  const res = await fetch(url);
+  return res.json();
+}
+
+export async function createConversation(title = "New conversation", agentId = "default"): Promise<{ id: string; title: string; agent_id: string }> {
   const res = await fetch(`${API_BASE}/conversations`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ title }),
+    body: JSON.stringify({ title, agent_id: agentId }),
   });
   return res.json();
 }

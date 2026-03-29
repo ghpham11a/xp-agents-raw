@@ -1,7 +1,7 @@
 # Plan
 
 ## Goal
-What is blockchain
+In a few sentences, what is Apache Flink?
 
 ## Steps
 - [ ] Research the topic

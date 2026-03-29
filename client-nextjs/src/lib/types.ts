@@ -1,7 +1,19 @@
 // ── Data models (matching backend) ────────────────────────
 
+export interface Agent {
+  id: string;
+  name: string;
+  description: string;
+  model: string;
+  system_prompt: string;
+  config_json: Record<string, unknown> | null;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface Conversation {
   id: string;
+  agent_id: string;
   title: string;
   created_at: string;
   updated_at: string;

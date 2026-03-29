@@ -19,6 +19,15 @@
   --color-od-cyan: #56b6c2;
   --color-od-orange: #d19a66;
 
+  /* VS Code structural colors */
+  --color-od-titlebar: #21252b;
+  --color-od-activitybar: #21252b;
+  --color-od-statusbar: #007acc;
+  --color-od-statusbar-fg: #ffffff;
+  --color-od-tab-active: #282c34;
+  --color-od-tab-inactive: #21252b;
+  --color-od-tab-border: #181a1f;
+
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }

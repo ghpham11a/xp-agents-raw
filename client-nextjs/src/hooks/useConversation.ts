@@ -4,17 +4,17 @@ import { useCallback, useEffect, useState } from "react";
 import * as api from "@/lib/api";
 import type { Conversation, Message } from "@/lib/types";
 
-export function useConversation() {
+export function useConversation(agentId?: string) {
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [loading, setLoading] = useState(false);
 
-  // Fetch conversation list
+  // Fetch conversation list (optionally filtered by agent)
   const refresh = useCallback(async () => {
-    const list = await api.listConversations();
+    const list = await api.listConversations(agentId);
     setConversations(list);
-  }, []);
+  }, [agentId]);
 
   useEffect(() => {
     refresh();
@@ -34,12 +34,15 @@ export function useConversation() {
 
   // Create a new conversation
   const createConversation = useCallback(async (title?: string) => {
-    const conv = await api.createConversation(title ?? `Chat ${new Date().toLocaleString()}`);
+    const conv = await api.createConversation(
+      title ?? `Chat ${new Date().toLocaleString()}`,
+      agentId ?? "default",
+    );
     await refresh();
     setActiveId(conv.id);
     setMessages([]);
     return conv.id;
-  }, [refresh]);
+  }, [agentId, refresh]);
 
   // Delete a conversation
   const removeConversation = useCallback(async (id: string) => {

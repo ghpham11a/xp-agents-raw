@@ -47,7 +47,7 @@ export default function InlinePlan({ runId, toolCalls }: InlinePlanProps) {
         <div>
           <button
             onClick={() => setPlanExpanded(!planExpanded)}
-            className="flex items-center gap-1.5 text-xs text-od-muted hover:text-od-text transition-colors"
+            className="flex items-center gap-1.5 text-xs uppercase text-od-muted hover:text-od-text transition-colors"
           >
             <span
               className="inline-block transition-transform text-[10px]"
@@ -70,7 +70,7 @@ export default function InlinePlan({ runId, toolCalls }: InlinePlanProps) {
         <div>
           <button
             onClick={() => setToolsExpanded(!toolsExpanded)}
-            className="flex items-center gap-1.5 text-xs text-od-muted hover:text-od-text transition-colors"
+            className="flex items-center gap-1.5 text-xs uppercase text-od-muted hover:text-od-text transition-colors"
           >
             <span
               className="inline-block transition-transform text-[10px]"
@@ -103,7 +103,7 @@ export default function InlinePlan({ runId, toolCalls }: InlinePlanProps) {
         <div>
           <button
             onClick={() => setFilesExpanded(!filesExpanded)}
-            className="flex items-center gap-1.5 text-xs text-od-muted hover:text-od-text transition-colors"
+            className="flex items-center gap-1.5 text-xs text-od-muted hover:text-od-text transition-colors uppercase"
           >
             <span
               className="inline-block transition-transform text-[10px]"
