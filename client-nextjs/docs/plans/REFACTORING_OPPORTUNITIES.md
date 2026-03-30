@@ -417,16 +417,16 @@ Sorted by impact on readability and learnability:
 | 4 | SSE event constants (#12) | Low | High | ✅ Done — `agent_events.py` with `EventType` class, used in streaming + router |
 | 5 | Collapsible component (#2) | Low | Medium | ✅ Done — `components/ui/Collapsible.tsx`, used in `WorkspacePanel` |
 | 6 | Icon components (#3) | Low | Medium | ✅ Done — `components/icons/index.tsx` with 9 icon components |
-| 7 | Data fetching hooks (#4) | Medium | Medium | ⬜ Not started |
+| 7 | Data fetching hooks (#4) | Medium | Medium | ✅ Done — `useRunData` hook in `hooks/useRunData.ts`, `InlinePlan` now uses hook + `Collapsible` |
 | 8 | Planner dedup (#10) | Low | Medium | ✅ Done — shared `_parse_planner_response`, `_save_plan_to_scratchpad`, single prompt constant |
-| 9 | Error handling in hooks (#5) | Medium | Medium | ⬜ Not started |
+| 9 | Error handling in hooks (#5) | Medium | Medium | ✅ Done — `useConversation` now exposes `error` + `clearError`, all async ops wrapped in try/catch |
 | 10 | Fix undefined method (#15) | Trivial | Medium | ✅ Done — removed `llm_check()` call from both agent loops |
 | 11 | Environment config (#7, #13) | Low | Medium | ✅ Done — `NEXT_PUBLIC_API_BASE` env var, `CORS_ORIGINS` env var |
 | 12 | Shared types (#8) | Trivial | Low | ✅ Done — `ToolCall` + `PendingApproval` moved to `types.ts` |
 | 13 | Remove dead code (#18) | Trivial | Low | ✅ Done — removed unused `accumulated_text` variable |
 | 14 | Navigation consistency (#6) | Low | Low | ✅ Done — both pages now use `router.push()` |
-| 15 | JSON helpers (#17) | Low | Low | ⬜ Not started |
+| 15 | JSON helpers (#17) | Low | Low | ✅ Done — `_to_json`/`_from_json` helpers in `queries.py`, all inline `json.dumps`/`json.loads` replaced |
 | 16 | HITL cleanup (#14) | Medium | Low | ✅ Done — added `finally` block for `_pending_approvals` cleanup |
-| 17 | Error conventions (#16) | Medium | Low | ⬜ Not started |
-| 18 | Event contract docs (#19) | Medium | Medium | ⬜ Not started |
-| 19 | Docstrings & docs (#20) | High | High | ⬜ Not started |
+| 17 | Error conventions (#16) | Medium | Low | ✅ Done — documented conventions in `agent_guardrails.py` module docstring (tools→strings, DB→None, guardrails→exceptions) |
+| 18 | Event contract docs (#19) | Medium | Medium | ✅ Done — `server-fastapi/docs/sse-events.md` documents all 7 event types with exact payload shapes |
+| 19 | Docstrings & docs (#20) | High | High | ✅ Done — docstrings on all public functions in queries, guardrails, planner, config, agent loops, utils; OpenAPI summaries on all routes |

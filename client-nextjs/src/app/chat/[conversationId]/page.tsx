@@ -120,7 +120,7 @@ export default function ConversationPage() {
 
   const handleNewChat = useCallback(async () => {
     const id = await createConversation();
-    router.push(`/chat/${id}`);
+    if (id) router.push(`/chat/${id}`);
   }, [createConversation, router]);
 
   const handleSelect = useCallback(

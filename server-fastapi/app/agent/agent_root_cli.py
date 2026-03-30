@@ -22,6 +22,7 @@ logger = logging.getLogger(__name__)
 # ============================================================
 
 def request_human_approval(tool_name: str, tool_input: dict) -> bool:
+    """Prompt the operator on stdin and return True if they approve."""
     print(f"\nAgent wants to call: {tool_name}")
     print(f"   Input: {json.dumps(tool_input, indent=2)}")
     return input("   Approve? (y/n): ").strip().lower() == "y"
@@ -37,8 +38,12 @@ def run_agent(
     tools: dict = None,
     resume_run_id: Optional[str] = None,
     base_dir: str = "./agent_runs",
-):
+) -> str:
+    """Run the synchronous (CLI) agent loop and return the final response text.
 
+    Follows the same flow as ``run_agent_streaming`` but blocks until
+    the agent finishes and returns the result as a plain string.
+    """
     tool_definitions = tool_definitions or []
     tools = tools or {}
 

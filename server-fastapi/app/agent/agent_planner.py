@@ -13,6 +13,8 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class Plan:
+    """Structured plan produced by the planner agent before the main loop begins."""
+
     goal: str
     steps: list[str]
     done_when: str
@@ -73,6 +75,7 @@ def _save_plan_to_scratchpad(plan: Plan, scratchpad: AgentScratchpad) -> None:
 # ============================================================
 
 def run_planner(task: str, scratchpad: AgentScratchpad, client: anthropic.Anthropic) -> Plan:
+    """Synchronous planner — call Haiku to produce a Plan, then persist it."""
     logger.info("Running planner...")
     response = client.messages.create(
         model="claude-haiku-4-5",
@@ -90,6 +93,7 @@ async def run_planner_async(
     scratchpad: AgentScratchpad,
     client: anthropic.AsyncAnthropic,
 ) -> Plan:
+    """Async planner — same as run_planner but non-blocking."""
     logger.info("Running planner...")
     response = await client.messages.create(
         model="claude-haiku-4-5",
@@ -107,6 +111,7 @@ async def run_planner_async(
 # ============================================================
 
 def parse_plan_md(content: str) -> Plan:
+    """Parse a plan.md file back into a Plan dataclass."""
     lines = content.splitlines()
     goal, steps, done_when, out_files, section = "", [], "", [], None
     for line in lines:
@@ -122,5 +127,6 @@ def parse_plan_md(content: str) -> Plan:
 
 
 def load_plan(scratchpad: AgentScratchpad) -> Plan:
+    """Read notes/plan.md from the scratchpad and parse it into a Plan."""
     content = scratchpad.read_file("notes/plan.md")
     return parse_plan_md(content)

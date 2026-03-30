@@ -1,3 +1,20 @@
+"""
+Guardrails and loop-limit enforcement for the agent.
+
+Error conventions used across the agent subsystem:
+
+- **Tool functions** (AgentMemory, AgentScratchpad) return plain strings
+  on both success and failure. These strings are fed back to Claude as
+  tool results, so raising would break the conversation loop.
+
+- **Database queries** (db/queries.py) return ``None`` for "not found".
+  The API router converts ``None`` into an HTTP 404.
+
+- **Guardrails and loop limits** (this module) raise typed exceptions
+  (subclasses of ``AgentLoopError``). The agent loop catches these at
+  the top level and translates them into error SSE events or CLI output.
+"""
+
 import re
 import time
 
@@ -37,6 +54,11 @@ class InputGuardrails:
     }
 
     def check(self, text: str) -> GuardrailResult:
+        """Screen user input for prompt-injection patterns and PII.
+
+        Returns BLOCK if injection is detected, MODIFY with redacted
+        text if PII is found, or ALLOW otherwise.
+        """
         for pattern in self.BLOCKED_PATTERNS:
             if re.search(pattern, text, re.IGNORECASE):
                 return GuardrailResult(GuardrailAction.BLOCK, "Prompt injection detected")
@@ -54,7 +76,8 @@ class InputGuardrails:
         return GuardrailResult(GuardrailAction.ALLOW)
     
 class OutputGuardrails:
-    
+    """Scrub sensitive data from the agent's final response before it reaches the user."""
+
     SENSITIVE_PATTERNS = {
         "internal_path": r"(/home|/var|/etc)/\S+",
         "stack_trace":   r"Traceback \(most recent call last\)",
@@ -75,7 +98,12 @@ class OutputGuardrails:
         return GuardrailResult(GuardrailAction.ALLOW)
     
 class ToolGuardrails:
-    
+    """Policy-based gate that runs before each tool call.
+
+    TOOL_POLICIES maps tool names to path allowlists/blocklists.
+    Tools not listed in the policy dict are allowed by default.
+    """
+
     TOOL_POLICIES = {
         "read_file": {
             "allowed_paths": ["/data/", "/reports/"],
@@ -115,7 +143,8 @@ class ConsecutiveErrorLimit(AgentLoopError): pass
 class SuspectedLoop(AgentLoopError): pass
 
 
-def check_limits(state: AgentState, config: AgentConfig):
+def check_limits(state: AgentState, config: AgentConfig) -> None:
+    """Raise an AgentLoopError subclass if any safety limit is exceeded."""
     if state.iterations >= config.max_iterations:
         raise MaxIterationsExceeded(f"Reached {state.iterations} iterations")
 

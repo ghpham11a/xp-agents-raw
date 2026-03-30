@@ -49,12 +49,12 @@ DB = Annotated[sqlite3.Connection, Depends(get_db_dep)]
 
 # ── Agents ─────────────────────────────────────────────────
 
-@router.get("/agents")
+@router.get("/agents", summary="List all agents")
 def list_agents(db: DB):
     return queries.list_agents(db)
 
 
-@router.post("/agents")
+@router.post("/agents", summary="Create an agent")
 def create_agent(req: CreateAgentRequest, db: DB):
     aid = queries.create_agent(
         db, req.id, req.name,
@@ -66,7 +66,7 @@ def create_agent(req: CreateAgentRequest, db: DB):
     return {"id": aid, "name": req.name}
 
 
-@router.get("/agents/{agent_id}")
+@router.get("/agents/{agent_id}", summary="Get an agent by ID")
 def get_agent(agent_id: str, db: DB):
     agent = queries.get_agent(db, agent_id)
     if not agent:
@@ -74,7 +74,7 @@ def get_agent(agent_id: str, db: DB):
     return agent
 
 
-@router.put("/agents/{agent_id}")
+@router.put("/agents/{agent_id}", summary="Update an agent")
 def update_agent(agent_id: str, req: UpdateAgentRequest, db: DB):
     agent = queries.get_agent(db, agent_id)
     if not agent:
@@ -83,7 +83,7 @@ def update_agent(agent_id: str, req: UpdateAgentRequest, db: DB):
     return {"ok": True}
 
 
-@router.delete("/agents/{agent_id}")
+@router.delete("/agents/{agent_id}", summary="Delete an agent and its data")
 def delete_agent(agent_id: str, db: DB):
     if agent_id == "default":
         raise HTTPException(status_code=400, detail="Cannot delete the default agent")
@@ -103,12 +103,12 @@ def delete_agent(agent_id: str, db: DB):
 
 # ── Conversations ─────────────────────────────────────────
 
-@router.get("/conversations")
+@router.get("/conversations", summary="List conversations")
 def list_conversations(agent_id: str | None = None, db: DB = None):
     return queries.list_conversations(db, agent_id=agent_id)
 
 
-@router.post("/conversations")
+@router.post("/conversations", summary="Create a conversation")
 def create_conversation(req: CreateConversationRequest, db: DB):
     agent = queries.get_agent(db, req.agent_id)
     if not agent:
@@ -117,7 +117,7 @@ def create_conversation(req: CreateConversationRequest, db: DB):
     return {"id": cid, "title": req.title, "agent_id": req.agent_id}
 
 
-@router.get("/conversations/{conversation_id}")
+@router.get("/conversations/{conversation_id}", summary="Get conversation with messages")
 def get_conversation(conversation_id: str, db: DB):
     conv = queries.get_conversation(db, conversation_id)
     if not conv:
@@ -126,7 +126,7 @@ def get_conversation(conversation_id: str, db: DB):
     return {**conv, "messages": messages}
 
 
-@router.delete("/conversations/{conversation_id}")
+@router.delete("/conversations/{conversation_id}", summary="Delete a conversation")
 def delete_conversation(conversation_id: str, db: DB):
     conv = queries.get_conversation(db, conversation_id)
     if not conv:
@@ -147,7 +147,11 @@ def delete_conversation(conversation_id: str, db: DB):
 
 # ── Messages & Streaming ─────────────────────────────────
 
-@router.post("/conversations/{conversation_id}/messages")
+@router.post(
+    "/conversations/{conversation_id}/messages",
+    summary="Send a message and stream the agent response",
+    description="Saves the user message, runs the agent loop, and returns an SSE stream. See docs/sse-events.md for the event schema.",
+)
 async def send_message(conversation_id: str, req: SendMessageRequest, db: DB):
     """Save the user message, then stream the agent's response as SSE events."""
     conv = queries.get_conversation(db, conversation_id)
@@ -204,7 +208,7 @@ async def send_message(conversation_id: str, req: SendMessageRequest, db: DB):
 
 # ── Human-in-the-loop Approval ────────────────────────────
 
-@router.post("/runs/{run_id}/approval")
+@router.post("/runs/{run_id}/approval", summary="Submit human-in-the-loop approval")
 async def handle_approval(run_id: str, req: ApprovalRequest):
     """Submit a human approval decision for a pending tool call."""
     if not submit_approval(run_id, req.approved):
@@ -227,7 +231,7 @@ def _find_run_dir(run_id: str) -> Path | None:
     return None
 
 
-@router.get("/runs/{run_id}/files")
+@router.get("/runs/{run_id}/files", summary="List files in an agent run")
 def list_run_files(run_id: str):
     run_dir = _find_run_dir(run_id)
     if not run_dir:
@@ -241,7 +245,7 @@ def list_run_files(run_id: str):
     return files
 
 
-@router.get("/runs/{run_id}/files/{file_path:path}")
+@router.get("/runs/{run_id}/files/{file_path:path}", summary="Read a file from an agent run")
 def read_run_file(run_id: str, file_path: str):
     run_dir = _find_run_dir(run_id)
     if not run_dir:
@@ -257,7 +261,7 @@ def read_run_file(run_id: str, file_path: str):
     return {"path": file_path, "content": target.read_text()}
 
 
-@router.get("/runs/{run_id}/plan")
+@router.get("/runs/{run_id}/plan", summary="Get the plan for an agent run")
 def get_run_plan(run_id: str):
     run_dir = _find_run_dir(run_id)
     if not run_dir:

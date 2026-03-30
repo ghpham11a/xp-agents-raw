@@ -13,6 +13,16 @@ def _new_id() -> str:
     return str(uuid.uuid4())
 
 
+def _to_json(data: dict | list | None) -> str | None:
+    """Serialize a dict/list to a JSON string for storage in SQLite."""
+    return json.dumps(data) if data else None
+
+
+def _from_json(text: str | None) -> dict | list | None:
+    """Deserialize a JSON string from SQLite back into a dict/list."""
+    return json.loads(text) if text else None
+
+
 # ── Agents ────────────────────────────────────────────────
 
 def create_agent(
@@ -24,17 +34,19 @@ def create_agent(
     system_prompt: str = "",
     config_json: dict | None = None,
 ) -> str:
+    """Insert a new agent and return its id."""
     now = _now()
     db.execute(
         "INSERT INTO agents (id, name, description, model, system_prompt, config_json, created_at, updated_at) "
         "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-        (agent_id, name, description, model, system_prompt, json.dumps(config_json) if config_json else None, now, now),
+        (agent_id, name, description, model, system_prompt, _to_json(config_json), now, now),
     )
     db.commit()
     return agent_id
 
 
 def get_agent(db: sqlite3.Connection, agent_id: str) -> dict | None:
+    """Fetch an agent by id, or None if not found."""
     row = db.execute(
         "SELECT id, name, description, model, system_prompt, config_json, created_at, updated_at FROM agents WHERE id = ?",
         (agent_id,),
@@ -42,18 +54,19 @@ def get_agent(db: sqlite3.Connection, agent_id: str) -> dict | None:
     if not row:
         return None
     d = dict(row)
-    d["config_json"] = json.loads(d["config_json"]) if d["config_json"] else None
+    d["config_json"] = _from_json(d["config_json"])
     return d
 
 
 def list_agents(db: sqlite3.Connection) -> list[dict]:
+    """Return all agents ordered by creation date."""
     rows = db.execute(
         "SELECT id, name, description, model, system_prompt, config_json, created_at, updated_at FROM agents ORDER BY created_at"
     ).fetchall()
     results = []
     for r in rows:
         d = dict(r)
-        d["config_json"] = json.loads(d["config_json"]) if d["config_json"] else None
+        d["config_json"] = _from_json(d["config_json"])
         results.append(d)
     return results
 
@@ -63,12 +76,13 @@ def update_agent(
     agent_id: str,
     **fields,
 ) -> bool:
+    """Update allowed fields on an agent. Returns False if nothing changed."""
     allowed = {"name", "description", "model", "system_prompt", "config_json"}
     updates = {k: v for k, v in fields.items() if k in allowed and v is not None}
     if not updates:
         return False
     if "config_json" in updates and isinstance(updates["config_json"], dict):
-        updates["config_json"] = json.dumps(updates["config_json"])
+        updates["config_json"] = _to_json(updates["config_json"])
     updates["updated_at"] = _now()
     set_clause = ", ".join(f"{k} = ?" for k in updates)
     db.execute(
@@ -79,7 +93,7 @@ def update_agent(
     return True
 
 
-def delete_agent(db: sqlite3.Connection, agent_id: str):
+def delete_agent(db: sqlite3.Connection, agent_id: str) -> None:
     # Delete all conversations and their messages first
     conv_ids = [r["id"] for r in db.execute(
         "SELECT id FROM conversations WHERE agent_id = ?", (agent_id,)
@@ -106,6 +120,7 @@ def create_conversation(db: sqlite3.Connection, title: str, agent_id: str = "def
 
 
 def list_conversations(db: sqlite3.Connection, agent_id: str | None = None) -> list[dict]:
+    """Return conversations, optionally filtered by agent, newest first."""
     if agent_id:
         rows = db.execute(
             "SELECT id, agent_id, title, created_at, updated_at FROM conversations WHERE agent_id = ? ORDER BY updated_at DESC",
@@ -119,6 +134,7 @@ def list_conversations(db: sqlite3.Connection, agent_id: str | None = None) -> l
 
 
 def get_conversation(db: sqlite3.Connection, conversation_id: str) -> dict | None:
+    """Fetch a conversation by id, or None if not found."""
     row = db.execute(
         "SELECT id, agent_id, title, created_at, updated_at FROM conversations WHERE id = ?",
         (conversation_id,),
@@ -126,7 +142,8 @@ def get_conversation(db: sqlite3.Connection, conversation_id: str) -> dict | Non
     return dict(row) if row else None
 
 
-def update_conversation_timestamp(db: sqlite3.Connection, conversation_id: str):
+def update_conversation_timestamp(db: sqlite3.Connection, conversation_id: str) -> None:
+    """Bump a conversation's updated_at to now (called after adding messages)."""
     db.execute(
         "UPDATE conversations SET updated_at = ? WHERE id = ?",
         (_now(), conversation_id),
@@ -143,7 +160,8 @@ def get_run_ids(db: sqlite3.Connection, conversation_id: str) -> list[str]:
     return [row["run_id"] for row in rows]
 
 
-def delete_conversation(db: sqlite3.Connection, conversation_id: str):
+def delete_conversation(db: sqlite3.Connection, conversation_id: str) -> None:
+    """Delete a conversation and all its messages."""
     db.execute("DELETE FROM messages WHERE conversation_id = ?", (conversation_id,))
     db.execute("DELETE FROM conversations WHERE id = ?", (conversation_id,))
     db.commit()
@@ -162,7 +180,7 @@ def add_message(
 ) -> str:
     """Add a message and return its id."""
     message_id = _new_id()
-    tool_calls_json = json.dumps(tool_calls) if tool_calls else None
+    tool_calls_json = _to_json(tool_calls)
     db.execute(
         "INSERT INTO messages (id, conversation_id, role, content, run_id, token_count, tool_calls, created_at) "
         "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
@@ -174,6 +192,7 @@ def add_message(
 
 
 def get_messages(db: sqlite3.Connection, conversation_id: str) -> list[dict]:
+    """Return all messages for a conversation, oldest first."""
     rows = db.execute(
         "SELECT id, conversation_id, role, content, run_id, token_count, tool_calls, created_at "
         "FROM messages WHERE conversation_id = ? ORDER BY created_at",
@@ -182,6 +201,6 @@ def get_messages(db: sqlite3.Connection, conversation_id: str) -> list[dict]:
     results = []
     for r in rows:
         d = dict(r)
-        d["tool_calls"] = json.loads(d["tool_calls"]) if d["tool_calls"] else None
+        d["tool_calls"] = _from_json(d["tool_calls"])
         results.append(d)
     return results
