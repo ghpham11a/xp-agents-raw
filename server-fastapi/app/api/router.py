@@ -1,16 +1,19 @@
 import logging
 import os
 import shutil
+import sqlite3
 
 from pathlib import Path
+from typing import Annotated
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Depends
 from fastapi.responses import StreamingResponse
 
 from db.database import get_db
 from db import queries
 from api.streaming import sse_generator
 from agent.agent_root_streaming import run_agent_streaming, submit_approval
+from agent.agent_events import EventType
 from schema import (
     CreateConversationRequest, SendMessageRequest, ApprovalRequest,
     CreateAgentRequest, UpdateAgentRequest,
@@ -28,70 +31,66 @@ def _agent_base_dir(agent_id: str) -> str:
     return os.path.join(BASE_DIR, agent_id)
 
 
+# ── DB Dependency ─────────────────────────────────────────
+# FastAPI calls get_db_dep() once per request, yielding a
+# connection. The finally block guarantees it closes even if
+# the route handler raises. Routes receive `db` as a param.
+
+def get_db_dep():
+    db = get_db()
+    try:
+        yield db
+    finally:
+        db.close()
+
+
+DB = Annotated[sqlite3.Connection, Depends(get_db_dep)]
+
+
 # ── Agents ─────────────────────────────────────────────────
 
 @router.get("/agents")
-def list_agents():
-    db = get_db()
-    try:
-        return queries.list_agents(db)
-    finally:
-        db.close()
+def list_agents(db: DB):
+    return queries.list_agents(db)
 
 
 @router.post("/agents")
-def create_agent(req: CreateAgentRequest):
-    db = get_db()
-    try:
-        aid = queries.create_agent(
-            db, req.id, req.name,
-            description=req.description,
-            model=req.model,
-            system_prompt=req.system_prompt,
-            config_json=req.config_json,
-        )
-        return {"id": aid, "name": req.name}
-    finally:
-        db.close()
+def create_agent(req: CreateAgentRequest, db: DB):
+    aid = queries.create_agent(
+        db, req.id, req.name,
+        description=req.description,
+        model=req.model,
+        system_prompt=req.system_prompt,
+        config_json=req.config_json,
+    )
+    return {"id": aid, "name": req.name}
 
 
 @router.get("/agents/{agent_id}")
-def get_agent(agent_id: str):
-    db = get_db()
-    try:
-        agent = queries.get_agent(db, agent_id)
-        if not agent:
-            raise HTTPException(status_code=404, detail="Agent not found")
-        return agent
-    finally:
-        db.close()
+def get_agent(agent_id: str, db: DB):
+    agent = queries.get_agent(db, agent_id)
+    if not agent:
+        raise HTTPException(status_code=404, detail="Agent not found")
+    return agent
 
 
 @router.put("/agents/{agent_id}")
-def update_agent(agent_id: str, req: UpdateAgentRequest):
-    db = get_db()
-    try:
-        agent = queries.get_agent(db, agent_id)
-        if not agent:
-            raise HTTPException(status_code=404, detail="Agent not found")
-        queries.update_agent(db, agent_id, **req.model_dump(exclude_none=True))
-        return {"ok": True}
-    finally:
-        db.close()
+def update_agent(agent_id: str, req: UpdateAgentRequest, db: DB):
+    agent = queries.get_agent(db, agent_id)
+    if not agent:
+        raise HTTPException(status_code=404, detail="Agent not found")
+    queries.update_agent(db, agent_id, **req.model_dump(exclude_none=True))
+    return {"ok": True}
 
 
 @router.delete("/agents/{agent_id}")
-def delete_agent(agent_id: str):
+def delete_agent(agent_id: str, db: DB):
     if agent_id == "default":
         raise HTTPException(status_code=400, detail="Cannot delete the default agent")
-    db = get_db()
-    try:
-        agent = queries.get_agent(db, agent_id)
-        if not agent:
-            raise HTTPException(status_code=404, detail="Agent not found")
-        queries.delete_agent(db, agent_id)
-    finally:
-        db.close()
+    agent = queries.get_agent(db, agent_id)
+    if not agent:
+        raise HTTPException(status_code=404, detail="Agent not found")
+    queries.delete_agent(db, agent_id)
 
     # Clean up agent_runs/{agent_id}/ directory
     agent_dir = Path(_agent_base_dir(agent_id))
@@ -105,54 +104,36 @@ def delete_agent(agent_id: str):
 # ── Conversations ─────────────────────────────────────────
 
 @router.get("/conversations")
-def list_conversations(agent_id: str | None = None):
-    db = get_db()
-    try:
-        return queries.list_conversations(db, agent_id=agent_id)
-    finally:
-        db.close()
+def list_conversations(agent_id: str | None = None, db: DB = None):
+    return queries.list_conversations(db, agent_id=agent_id)
 
 
 @router.post("/conversations")
-def create_conversation(req: CreateConversationRequest):
-    db = get_db()
-    try:
-        # Verify agent exists
-        agent = queries.get_agent(db, req.agent_id)
-        if not agent:
-            raise HTTPException(status_code=404, detail="Agent not found")
-        cid = queries.create_conversation(db, req.title, agent_id=req.agent_id)
-        return {"id": cid, "title": req.title, "agent_id": req.agent_id}
-    finally:
-        db.close()
+def create_conversation(req: CreateConversationRequest, db: DB):
+    agent = queries.get_agent(db, req.agent_id)
+    if not agent:
+        raise HTTPException(status_code=404, detail="Agent not found")
+    cid = queries.create_conversation(db, req.title, agent_id=req.agent_id)
+    return {"id": cid, "title": req.title, "agent_id": req.agent_id}
 
 
 @router.get("/conversations/{conversation_id}")
-def get_conversation(conversation_id: str):
-    db = get_db()
-    try:
-        conv = queries.get_conversation(db, conversation_id)
-        if not conv:
-            raise HTTPException(status_code=404, detail="Conversation not found")
-        messages = queries.get_messages(db, conversation_id)
-        return {**conv, "messages": messages}
-    finally:
-        db.close()
+def get_conversation(conversation_id: str, db: DB):
+    conv = queries.get_conversation(db, conversation_id)
+    if not conv:
+        raise HTTPException(status_code=404, detail="Conversation not found")
+    messages = queries.get_messages(db, conversation_id)
+    return {**conv, "messages": messages}
 
 
 @router.delete("/conversations/{conversation_id}")
-def delete_conversation(conversation_id: str):
-    db = get_db()
-    try:
-        conv = queries.get_conversation(db, conversation_id)
-        if not conv:
-            raise HTTPException(status_code=404, detail="Conversation not found")
-        agent_id = conv["agent_id"]
-        # Collect run_ids before deleting messages
-        run_ids = queries.get_run_ids(db, conversation_id)
-        queries.delete_conversation(db, conversation_id)
-    finally:
-        db.close()
+def delete_conversation(conversation_id: str, db: DB):
+    conv = queries.get_conversation(db, conversation_id)
+    if not conv:
+        raise HTTPException(status_code=404, detail="Conversation not found")
+    agent_id = conv["agent_id"]
+    run_ids = queries.get_run_ids(db, conversation_id)
+    queries.delete_conversation(db, conversation_id)
 
     # Clean up agent_runs/{agent_id}/{run_id}/ directories
     for run_id in run_ids:
@@ -167,21 +148,14 @@ def delete_conversation(conversation_id: str):
 # ── Messages & Streaming ─────────────────────────────────
 
 @router.post("/conversations/{conversation_id}/messages")
-async def send_message(conversation_id: str, req: SendMessageRequest):
-    """
-    Save the user message, then stream the agent's response as SSE events.
-    """
-    db = get_db()
-    try:
-        conv = queries.get_conversation(db, conversation_id)
-        if not conv:
-            raise HTTPException(status_code=404, detail="Conversation not found")
-        agent_id = conv["agent_id"]
-        queries.add_message(db, conversation_id, "user", req.content)
-    finally:
-        db.close()
+async def send_message(conversation_id: str, req: SendMessageRequest, db: DB):
+    """Save the user message, then stream the agent's response as SSE events."""
+    conv = queries.get_conversation(db, conversation_id)
+    if not conv:
+        raise HTTPException(status_code=404, detail="Conversation not found")
+    agent_id = conv["agent_id"]
+    queries.add_message(db, conversation_id, "user", req.content)
 
-    # Use the latest user message as the task
     task = req.content
     agent_dir = _agent_base_dir(agent_id)
 
@@ -195,28 +169,27 @@ async def send_message(conversation_id: str, req: SendMessageRequest):
         async for event in run_agent_streaming(task=task, base_dir=agent_dir):
             yield event
 
-            if event["type"] == "text_delta":
+            if event["type"] == EventType.TEXT_DELTA:
                 final_text += event["data"]["content"]
-            elif event["type"] == "tool_call":
+            elif event["type"] == EventType.TOOL_CALL:
                 tool_calls.append(event["data"])
-            elif event["type"] == "done":
+            elif event["type"] == EventType.DONE:
                 run_id = event["data"].get("run_id")
                 total_tokens = event["data"].get("total_tokens")
-                # Use final_text from done event if available (guardrail-processed)
                 if event["data"].get("final_text"):
                     final_text = event["data"]["final_text"]
 
         # Save assistant message to DB
         if final_text:
-            db = get_db()
+            save_db = get_db()
             try:
                 queries.add_message(
-                    db, conversation_id, "assistant", final_text,
+                    save_db, conversation_id, "assistant", final_text,
                     run_id=run_id, token_count=total_tokens,
                     tool_calls=tool_calls or None,
                 )
             finally:
-                db.close()
+                save_db.close()
 
     return StreamingResponse(
         sse_generator(stream_and_save()),

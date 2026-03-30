@@ -118,3 +118,17 @@ export interface FileInfo {
   path: string;
   size: number;
 }
+
+// ── Agent stream types ───────────────────────────────────
+
+export interface ToolCall {
+  tool: string;
+  input: Record<string, unknown>;
+  result: string;
+}
+
+export interface PendingApproval {
+  runId: string;
+  tool: string;
+  input: Record<string, unknown>;
+}

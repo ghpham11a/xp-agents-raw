@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import type { Message } from "@/lib/types";
-import type { PendingApproval } from "@/hooks/useAgentStream";
+import type { Message, PendingApproval } from "@/lib/types";
+import { ChatBubbleLargeIcon } from "@/components/icons";
 import MessageBubble from "./MessageBubble";
 import MessageInput from "./MessageInput";
 
@@ -42,9 +42,7 @@ export default function ChatPanel({
         {messages.length === 0 && !isStreaming && (
           <div className="flex-1 flex items-center justify-center h-full">
             <div className="text-center text-od-muted">
-              <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round" className="mx-auto mb-3 text-od-muted/30">
-                <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z" />
-              </svg>
+              <ChatBubbleLargeIcon className="mx-auto mb-3 text-od-muted/30" />
               <p className="text-sm font-medium text-od-text">Start a conversation</p>
               <p className="text-xs mt-1">Send a message to begin working with the agent.</p>
             </div>

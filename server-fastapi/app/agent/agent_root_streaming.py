@@ -17,6 +17,8 @@ from agent.agent_guardrails import (
     InputGuardrails, OutputGuardrails, ToolGuardrails,
     GuardrailAction, AgentLoopError, check_limits,
 )
+from agent.agent_events import EventType
+from agent.agent_utils import build_system_prompt, format_tool_result, check_tool_guardrail
 
 logger = logging.getLogger(__name__)
 
@@ -75,18 +77,14 @@ async def run_agent_streaming(
     guard_result = input_guard.check(task)
     if guard_result.action == GuardrailAction.BLOCK:
         logger.warning(f"Input blocked: {guard_result.reason}")
-        yield {"type": "error", "data": {"message": f"Request blocked: {guard_result.reason}"}}
+        yield {
+            "type": EventType.ERROR,
+            "data": {"message": f"Request blocked: {guard_result.reason}"},
+        }
         return
     if guard_result.action == GuardrailAction.MODIFY:
         logger.info(f"Input modified: {guard_result.reason}")
         task = guard_result.modified_content
-
-    if config.use_llm_input_guard:
-        llm_result = input_guard.llm_check(task)
-        if llm_result.action == GuardrailAction.BLOCK:
-            logger.warning(f"LLM input blocked: {llm_result.reason}")
-            yield {"type": "error", "data": {"message": f"Request blocked: {llm_result.reason}"}}
-            return
 
     # ----------------------------------------------------------
     # SETUP — scratchpad, state, plan
@@ -102,7 +100,7 @@ async def run_agent_streaming(
 
         plan = await run_planner_async(task, scratchpad, client)
         yield {
-            "type": "plan",
+            "type": EventType.PLAN,
             "data": {
                 "goal": plan.goal,
                 "steps": plan.steps,
@@ -122,24 +120,7 @@ async def run_agent_streaming(
         + MEMORY_TOOL_DEFINITIONS
     )
 
-    existing_memories = memory.list()
-
-    system_prompt = (
-        f"You are a helpful agent.\n\n"
-        f"## Goal\n{plan.goal}\n\n"
-        "## Plan\n"
-        "Read notes/plan.md for your step-by-step plan.\n\n"
-        "## Memory vs Scratchpad\n"
-        "- save_memory / load_memory  → long-term, survives across runs\n"
-        "- write_file / read_file     → this run only, working notes and drafts\n\n"
-        "## Memories from prior runs\n"
-        f"{existing_memories}\n"
-        "Load any that seem relevant with load_memory before starting work.\n"
-        "Save anything worth keeping with save_memory before you finish.\n\n"
-        "## Done When\n"
-        f"{plan.done_when}\n"
-        f"Expected output files: {', '.join(plan.output_files)}"
-    )
+    system_prompt = build_system_prompt(plan, memory.list())
 
     if not state.messages:
         state.messages = [{"role": "user", "content": task}]
@@ -153,8 +134,6 @@ async def run_agent_streaming(
             # --------------------------------------------------
             # STREAM the Claude response
             # --------------------------------------------------
-            accumulated_text = ""
-
             try:
                 async with client.messages.stream(
                     model="claude-opus-4-5",
@@ -166,14 +145,16 @@ async def run_agent_streaming(
                     async for event in stream:
                         if event.type == "content_block_delta":
                             if event.delta.type == "text_delta":
-                                accumulated_text += event.delta.text
-                                yield {"type": "text_delta", "data": {"content": event.delta.text}}
+                                yield {
+                                    "type": EventType.TEXT_DELTA,
+                                    "data": {"content": event.delta.text},
+                                }
 
                     response = await stream.get_final_message()
             except anthropic.APIError as e:
                 state.consecutive_errors += 1
                 logger.warning(f"API error: {e}")
-                yield {"type": "error", "data": {"message": str(e)}}
+                yield {"type": EventType.ERROR, "data": {"message": str(e)}}
                 if state.consecutive_errors < config.max_consecutive_errors:
                     continue
                 else:
@@ -203,8 +184,11 @@ async def run_agent_streaming(
                 out_result = output_guard.check(final_text)
                 if out_result.action == GuardrailAction.BLOCK:
                     logger.warning("Output blocked by guardrail")
-                    yield {"type": "error", "data": {"message": "Response blocked by output policy."}}
-                    return 
+                    yield {
+                        "type": EventType.ERROR,
+                        "data": {"message": "Response blocked by output policy."},
+                    }
+                    return
                 if out_result.action == GuardrailAction.MODIFY:
                     logger.info(f"Output modified: {out_result.reason}")
                     final_text = out_result.modified_content
@@ -213,7 +197,7 @@ async def run_agent_streaming(
                 state.save(scratchpad)
 
                 yield {
-                    "type": "done",
+                    "type": EventType.DONE,
                     "data": {
                         "run_id": state.run_id,
                         "iterations": state.iterations,
@@ -236,15 +220,10 @@ async def run_agent_streaming(
                 )
 
                 # Tool guardrail
-                tool_check = tool_guard.check(block.name, block.input)
-                if tool_check.action == GuardrailAction.BLOCK:
-                    logger.warning(f"Tool blocked: {tool_check.reason}")
-                    tool_results.append({
-                        "type": "tool_result",
-                        "tool_use_id": block.id,
-                        "content": f"Blocked by policy: {tool_check.reason}",
-                        "is_error": True,
-                    })
+                block_reason = check_tool_guardrail(tool_guard, block.name, block.input)
+                if block_reason:
+                    logger.warning(f"Tool blocked: {block_reason}")
+                    tool_results.append(format_tool_result(block.id, block_reason, is_error=True))
                     continue
 
                 # Human-in-the-loop
@@ -253,7 +232,7 @@ async def run_agent_streaming(
                     _pending_approvals[state.run_id] = approval_queue
 
                     yield {
-                        "type": "approval_request",
+                        "type": EventType.APPROVAL_REQUEST,
                         "data": {
                             "run_id": state.run_id,
                             "tool": block.name,
@@ -261,16 +240,17 @@ async def run_agent_streaming(
                         },
                     }
 
-                    approved = await approval_queue.get()
-                    _pending_approvals.pop(state.run_id, None)
+                    try:
+                        approved = await approval_queue.get()
+                    finally:
+                        _pending_approvals.pop(state.run_id, None)
 
                     if not approved:
-                        tool_results.append({
-                            "type": "tool_result",
-                            "tool_use_id": block.id,
-                            "content": "Human rejected this action. Try a different approach.",
-                            "is_error": True,
-                        })
+                        tool_results.append(format_tool_result(
+                            block.id,
+                            "Human rejected this action. Try a different approach.",
+                            is_error=True,
+                        ))
                         continue
 
                 # Execute the tool
@@ -278,15 +258,11 @@ async def run_agent_streaming(
                     result = all_tools[block.name](**block.input)
                     state.consecutive_errors = 0
 
-                    tool_results.append({
-                        "type": "tool_result",
-                        "tool_use_id": block.id,
-                        "content": str(result),
-                    })
+                    tool_results.append(format_tool_result(block.id, str(result)))
 
                     # Yield tool_call event for the UI
                     yield {
-                        "type": "tool_call",
+                        "type": EventType.TOOL_CALL,
                         "data": {
                             "tool": block.name,
                             "input": block.input,
@@ -298,7 +274,7 @@ async def run_agent_streaming(
                     if block.name in ("write_file", "append_file"):
                         file_path = block.input.get("path", "")
                         yield {
-                            "type": "file_update",
+                            "type": EventType.FILE_UPDATE,
                             "data": {
                                 "path": file_path,
                                 "action": "created" if block.name == "write_file" else "updated",
@@ -307,13 +283,13 @@ async def run_agent_streaming(
                         }
                     elif block.name == "delete_file":
                         yield {
-                            "type": "file_update",
+                            "type": EventType.FILE_UPDATE,
                             "data": {"path": block.input.get("path", ""), "action": "deleted"},
                         }
                     elif block.name == "move_file":
                         dst_path = block.input.get("dst", "")
                         yield {
-                            "type": "file_update",
+                            "type": EventType.FILE_UPDATE,
                             "data": {
                                 "path": dst_path,
                                 "action": "created",
@@ -323,12 +299,7 @@ async def run_agent_streaming(
 
                 except Exception as e:
                     state.consecutive_errors += 1
-                    tool_results.append({
-                        "type": "tool_result",
-                        "tool_use_id": block.id,
-                        "content": f"Error: {e}",
-                        "is_error": True,
-                    })
+                    tool_results.append(format_tool_result(block.id, f"Error: {e}", is_error=True))
 
             state.messages.append({"role": "assistant", "content": response.content})
             state.messages.append({"role": "user", "content": tool_results})
@@ -337,7 +308,7 @@ async def run_agent_streaming(
     except AgentLoopError as e:
         state.status = "failed"
         state.save(scratchpad)
-        yield {"type": "error", "data": {"message": f"Agent stopped: {e}"}}
+        yield {"type": EventType.ERROR, "data": {"message": f"Agent stopped: {e}"}}
     finally:
         elapsed = time.time() - state.start_time
         logger.info(

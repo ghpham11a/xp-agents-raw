@@ -13,7 +13,7 @@ from agent.agent_planner import run_planner, Plan, load_plan
 from agent.agent_memory import AgentMemory, MEMORY_TOOL_DEFINITIONS
 from agent.agent_scratchpad import AgentScratchpad, SCRATCHPAD_TOOL_DEFINITIONS
 from agent.agent_guardrails import InputGuardrails, OutputGuardrails, ToolGuardrails, GuardrailAction, AgentLoopError, check_limits
-from agent.agent_utils import print_summary
+from agent.agent_utils import print_summary, build_system_prompt, format_tool_result, check_tool_guardrail
 
 logger = logging.getLogger(__name__)
 
@@ -25,7 +25,7 @@ def request_human_approval(tool_name: str, tool_input: dict) -> bool:
     print(f"\nAgent wants to call: {tool_name}")
     print(f"   Input: {json.dumps(tool_input, indent=2)}")
     return input("   Approve? (y/n): ").strip().lower() == "y"
-    
+
 # ============================================================
 # CORE AGENT LOOP
 # ============================================================
@@ -38,7 +38,7 @@ def run_agent(
     resume_run_id: Optional[str] = None,
     base_dir: str = "./agent_runs",
 ):
-    
+
     tool_definitions = tool_definitions or []
     tools = tools or {}
 
@@ -59,12 +59,6 @@ def run_agent(
     if guard_result.action == GuardrailAction.MODIFY:
         logger.info(f"Input modified: {guard_result.reason}")
         task = guard_result.modified_content
-
-    if config.use_llm_input_guard:
-        llm_result = input_guard.llm_check(task)
-        if llm_result.action == GuardrailAction.BLOCK:
-            logger.warning(f"LLM input blocked: {llm_result.reason}")
-            return f"Request blocked: {llm_result.reason}"
 
     # ----------------------------------------------------------
     # SETUP — scratchpad, state, plan
@@ -90,24 +84,7 @@ def run_agent(
         + MEMORY_TOOL_DEFINITIONS
     )
 
-    existing_memories = memory.list()
-
-    system_prompt = (
-        f"You are a helpful agent.\n\n"
-        f"## Goal\n{plan.goal}\n\n"
-        "## Plan\n"
-        "Read notes/plan.md for your step-by-step plan.\n\n"
-        "## Memory vs Scratchpad\n"
-        "- save_memory / load_memory  → long-term, survives across runs\n"
-        "- write_file / read_file     → this run only, working notes and drafts\n\n"
-        "## Memories from prior runs\n"
-        f"{existing_memories}\n"
-        "Load any that seem relevant with load_memory before starting work.\n"
-        "Save anything worth keeping with save_memory before you finish.\n\n"
-        "## Done When\n"
-        f"{plan.done_when}\n"
-        f"Expected output files: {', '.join(plan.output_files)}"
-    )
+    system_prompt = build_system_prompt(plan, memory.list())
 
     if not state.messages:
         state.messages = [{"role": "user", "content": task}]
@@ -162,7 +139,7 @@ def run_agent(
                 state.save(scratchpad)
                 print_summary(state, scratchpad, memory, plan)
                 return final
-            
+
             # ------------------------------------------------------
             # TOOL EXECUTION — tool guardrails + HITL before each call
             # ------------------------------------------------------
@@ -176,46 +153,31 @@ def run_agent(
                 )
 
                 # Tool guardrail
-                tool_check = tool_guard.check(block.name, block.input)
-                if tool_check.action == GuardrailAction.BLOCK:
-                    logger.warning(f"Tool blocked: {tool_check.reason}")
-                    tool_results.append({
-                        "type": "tool_result",
-                        "tool_use_id": block.id,
-                        "content": f"Blocked by policy: {tool_check.reason}",
-                        "is_error": True
-                    })
+                block_reason = check_tool_guardrail(tool_guard, block.name, block.input)
+                if block_reason:
+                    logger.warning(f"Tool blocked: {block_reason}")
+                    tool_results.append(format_tool_result(block.id, block_reason, is_error=True))
                     continue
 
                 # Human-in-the-loop
                 if block.name in config.require_human_approval_for:
                     approved = request_human_approval(block.name, block.input)
                     if not approved:
-                        tool_results.append({
-                            "type": "tool_result",
-                            "tool_use_id": block.id,
-                            "content": "Human rejected this action. Try a different approach.",
-                            "is_error": True
-                        })
+                        tool_results.append(format_tool_result(
+                            block.id,
+                            "Human rejected this action. Try a different approach.",
+                            is_error=True,
+                        ))
                         continue
 
                 # Execute
                 try:
                     result = all_tools[block.name](**block.input)
                     state.consecutive_errors = 0
-                    tool_results.append({
-                        "type": "tool_result",
-                        "tool_use_id": block.id,
-                        "content": str(result)
-                    }) 
+                    tool_results.append(format_tool_result(block.id, str(result)))
                 except Exception as e:
                     state.consecutive_errors += 1
-                    tool_results.append({
-                        "type": "tool_result",
-                        "tool_use_id": block.id,
-                        "content": f"Error: {e}",
-                        "is_error": True
-                    })
+                    tool_results.append(format_tool_result(block.id, f"Error: {e}", is_error=True))
 
             state.messages.append({"role": "assistant", "content": response.content})
             state.messages.append({"role": "user", "content": tool_results})
@@ -228,4 +190,3 @@ def run_agent(
     finally:
         elapsed = time.time() - state.start_time
         logger.info(f"[{state.run_id}] Done. Iterations: {state.iterations} | Tokens: {state.total_tokens} | Time: {elapsed:.1f}s")
-

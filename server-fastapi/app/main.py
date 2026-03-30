@@ -1,4 +1,5 @@
 import logging
+import os
 import sys
 
 from pathlib import Path
@@ -36,7 +37,7 @@ app = FastAPI(title="Agent Chat API", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3005"],
+    allow_origins=os.getenv("CORS_ORIGINS", "http://localhost:3005").split(","),
     allow_methods=["*"],
     allow_headers=["*"],
 )

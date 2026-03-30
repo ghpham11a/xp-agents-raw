@@ -2,19 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { streamMessage, submitApproval } from "@/lib/api";
-import type { Plan, SSEEvent, FileInfo } from "@/lib/types";
-
-export interface ToolCall {
-  tool: string;
-  input: Record<string, unknown>;
-  result: string;
-}
-
-export interface PendingApproval {
-  runId: string;
-  tool: string;
-  input: Record<string, unknown>;
-}
+import type { Plan, SSEEvent, FileInfo, ToolCall, PendingApproval } from "@/lib/types";
 
 export interface AgentStreamState {
   // Chat

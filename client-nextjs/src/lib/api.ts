@@ -1,6 +1,6 @@
 import type { Agent, Conversation, ConversationWithMessages, FileInfo, SSEEvent } from "./types";
 
-const API_BASE = "http://localhost:8005/api";
+const API_BASE = process.env.NEXT_PUBLIC_API_BASE || "http://localhost:8005/api";
 
 // ── Agents ───────────────────────────────────────────────
 
